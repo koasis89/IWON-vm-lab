@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# =============================================================
+# /etc/letsencrypt/renewal-hooks/deploy/10-azure-update.sh
+#
+# certbot 자동갱신 성공 시 자동으로 실행되는 deploy hook.
+# 역할:
+#   1. 갱신된 인증서를 PFX 로 변환
+#   2. Azure Key Vault 에 import
+#   3. App Gateway SSL cert 를 신규 KV SID 로 갱신
+#
+# 환경 변수는 /etc/iwon/az-sp-env.sh 에서 주입.
+# certbot 이 이 스크립트를 호출할 때 다음 환경변수를 설정:
+#   RENEWED_LINEAGE  : /etc/letsencrypt/live/<domain>
+#   RENEWED_DOMAINS  : 갱신된 도메인 목록
+# =============================================================
+set -euo pipefail
+
+LOG=/var/log/certbot-azure-update.log
+exec >> "$LOG" 2>&1
+
+echo "=========================================="
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] certbot deploy hook 시작"
+echo "  RENEWED_LINEAGE : ${RENEWED_LINEAGE}"
+echo "  RENEWED_DOMAINS : ${RENEWED_DOMAINS}"
+
+# Azure SP 환경변수 로드
+# shellcheck source=/dev/null
+source /etc/iwon/az-sp-env.sh
+
+# ── 변수 ────────────────────────────────────────────────────────
+RESOURCE_GROUP="{{ az_resource_group }}"
+APPGW_NAME="{{ az_appgw_name }}"
+KV_NAME="{{ az_keyvault_name }}"
+KV_CERT_NAME="{{ az_kv_cert_name }}"
+PFX_PATH="/tmp/certbot-renew.pfx"
+PFX_PASS="{{ certbot_pfx_password }}"
+
+# ── 1. Azure CLI 로그인 (서비스 주체) ───────────────────────────
+echo "[1/4] Azure SP 로그인..."
+az login --service-principal \
+  --username  "$AZURE_CLIENT_ID" \
+  --password  "$AZURE_CLIENT_SECRET" \
+  --tenant    "$AZURE_TENANT_ID" \
+  --output    none
+
+# ── 2. PFX 변환 ────────────────────────────────────────────────
+echo "[2/4] PFX 변환..."
+openssl pkcs12 -export \
+  -out     "$PFX_PATH" \
+  -inkey   "${RENEWED_LINEAGE}/privkey.pem" \
+  -in      "${RENEWED_LINEAGE}/fullchain.pem" \
+  -passout "pass:${PFX_PASS}"
+
+# ── 3. Key Vault import ──────────────────────────────────────────
+echo "[3/4] Key Vault import..."
+az keyvault certificate import \
+  --vault-name "$KV_NAME" \
+  --name       "$KV_CERT_NAME" \
+  --file       "$PFX_PATH" \
+  --password   "$PFX_PASS" \
+  --output     none
+
+# SID 조회
+SID=$(az keyvault certificate show \
+  --vault-name "$KV_NAME" \
+  --name       "$KV_CERT_NAME" \
+  --query sid -o tsv)
+
+echo "  Key Vault SID: $SID"
+
+# ── 4. App Gateway SSL cert 갱신 ────────────────────────────────
+echo "[4/4] App Gateway SSL 갱신..."
+az network application-gateway ssl-cert update \
+  -g                    "$RESOURCE_GROUP" \
+  --gateway-name        "$APPGW_NAME" \
+  -n                    "$KV_CERT_NAME" \
+  --key-vault-secret-id "$SID" \
+  --output              none
+
+# provisioningState 폴링 (최대 60초)
+for i in $(seq 1 6); do
+  STATE=$(az network application-gateway ssl-cert show \
+    -g              "$RESOURCE_GROUP" \
+    --gateway-name  "$APPGW_NAME" \
+    -n              "$KV_CERT_NAME" \
+    --query provisioningState -o tsv 2>/dev/null || echo "Unknown")
+  echo "  provisioningState: $STATE (시도 $i/6)"
+  [ "$STATE" = "Succeeded" ] && break
+  sleep 10
+done
+
+if [ "$STATE" != "Succeeded" ]; then
+  echo "[ERROR] App Gateway SSL 갱신 실패: $STATE"
+  rm -f "$PFX_PATH"
+  exit 1
+fi
+
+# ── 정리 ─────────────────────────────────────────────────────────
+rm -f "$PFX_PATH"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] 완료: App Gateway SSL 갱신 성공"
+echo "=========================================="

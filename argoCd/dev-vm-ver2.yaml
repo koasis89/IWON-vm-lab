@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-web-nginx
+  namespace: dev-vm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dev-web-nginx
+  template:
+    metadata:
+      labels:
+        app: dev-web-nginx
+    spec:
+      containers:
+        - name: nginx
+          image: itecloudcenter/ite-private-repo:runtime-nginx
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          command: ["sh", "-lc"]
+          args:
+            - |
+              echo "[dev-web-nginx] container started"
+              tail -f /dev/null
+          stdin: true
+          tty: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-was
+  namespace: dev-vm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dev-was
+  template:
+    metadata:
+      labels:
+        app: dev-was
+    spec:
+      containers:
+        - name: jdk
+          image: itecloudcenter/ite-private-repo:ci-jdk17
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          command: ["sh", "-lc"]
+          args:
+            - |
+              echo "[dev-was] container started"
+              tail -f /dev/null
+          stdin: true
+          tty: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-app
+  namespace: dev-vm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dev-app
+  template:
+    metadata:
+      labels:
+        app: dev-app
+    spec:
+      containers:
+        - name: jdk
+          image: itecloudcenter/ite-private-repo:ci-jdk17
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          command: ["sh", "-lc"]
+          args:
+            - |
+              echo "[dev-app] container started"
+              tail -f /dev/null
+          stdin: true
+          tty: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-smartcontract
+  namespace: dev-vm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dev-smartcontract
+  template:
+    metadata:
+      labels:
+        app: dev-smartcontract
+    spec:
+      containers:
+        - name: jdk
+          image: itecloudcenter/ite-private-repo:ci-jdk17
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          command: ["sh", "-lc"]
+          args:
+            - |
+              echo "[dev-smartcontract] container started"
+              tail -f /dev/null
+          stdin: true
+          tty: true

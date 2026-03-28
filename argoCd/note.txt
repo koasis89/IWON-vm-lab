@@ -1,0 +1,28 @@
+Argo flow 로그인 시 
+[If your organisation has configured client authentication, get your token following this instructions from here and paste in this box:]
+란에 Bearer 토큰을 입력하시면 됩니다.
+토큰 값
+Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImhPdi01LWVRZDgxS0pZVmlHZXJndUVDWTNoVEhMNDdJMER3bXh0Q2V6eEEifQ.eyJhdWQiOlsiaHR0cHM6Ly9rdWJlcm5ldGVzLmRlZmF1bHQuc3ZjLmNsdXN0ZXIubG9jYWwiXSwiZXhwIjoxODAyMTQ2NTQ2LCJpYXQiOjE3NzA2MTA1NDYsImlzcyI6Imh0dHBzOi8va3ViZXJuZXRlcy5kZWZhdWx0LnN2Yy5jbHVzdGVyLmxvY2FsIiwianRpIjoiM2EyYTBkNWUtODRiZC00ZDNhLWI0YmQtYjgzNTMyZTcxNzVjIiwia3ViZXJuZXRlcy5pbyI6eyJuYW1lc3BhY2UiOiJhcmdvIiwic2VydmljZWFjY291bnQiOnsibmFtZSI6ImFyZ28tdWkiLCJ1aWQiOiIwY2JhNWU1Zi0wZDA1LTQxYTgtOGM5YS0wMzdkOTgzYzljNjYifX0sIm5iZiI6MTc3MDYxMDU0Niwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50OmFyZ286YXJnby11aSJ9.Lsc0f0-hE0MtWptBZhpGjkMYTdzzZSmRFx3YLYsgLpSQUfQnVQMrObpceP7LpxHq747gVOlOxfRMHZXX2lrG9Mx_it4UJvzHIaKEjyWK6S3RoBXB0ErWfJIBl3zKa4RxeKvZuqu2r7SNBqqEAhqDJfs8Cn6yePn-R2TP_baLgvREqLAJRgQ7YC0Y6WPdVKjN2wNBiuZlK0CcuTIoH4zelnwN7LXkaQE_Zi065ZvIg-2qHWZwkFcmbZss0F99BV3JifcYkjDf1hOoYbur95ykdc61hROo3MzvBApNqr8fgdFVZxrK2S4NFAMITLa2M1DaoWm7uALp12tmV5EMRs77Xw
+
+현재 사용 가능한 argo workflow의 template은 argo-workflow-ci-ver3.yaml 파일에 정의되어 있습니다.
+UI상 이름은 workflow-ci-ver5입니다.
+현제 자동화는 구현되어있지 않으며 
+git username과 password는 PAT을 통해 입력하시면 됩니다.
+
+프론트엔드는 정적 리소스로 빌드 하여 nginx로 서빙하는 형태로 구현되어 있습니다.
+Argo workflow에서는 소스코드 빌드와 docker image 빌드를 진행하며, 빌드된 docker image는 docker hub에 push 됩니다.
+docker hub정보는 
+ID: soloh@iteyes.co.kr
+PW: <CHANGE_ME_ADMIN_PASSWORD>
+이며 repository는
+itecloudcenter/builds - 빌드 결과물 저장소
+itecloudcenter/ite-private-repo - 빌드에 필요한 jdk등의 이미지 저장소
+
+테스트 완료사항으로는 프론트엔드 CICD까지 완료되었습니다
+1. argo workflow 에서 소스코드빌드, 이미지 빌드, docker hub push
+2. argocd 에서 manifest git을 통해 배포
+
+ArgoCD URL : http://192.168.0.111:30008/
+ID: admin
+PW: <CHANGE_ME_ADMIN_PASSWORD>
+

@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "18"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"name":"dev-integration","namespace":"dev-vm"},"spec":{"replicas":1,"selector":{"matchLabels":{"app":"dev-integration"}},"strategy":{"rollingUpdate":{"maxSurge":"25%","maxUnavailable":"25%"},"type":"RollingUpdate"},"template":{"metadata":{"labels":{"app":"dev-integration"}},"spec":{"containers":[{"args":["echo \"[dev-integration] idle mode (upload jar then run manually)\"\nsleep infinity\n"],"command":["sh","-lc"],"image":"itecloudcenter/ite-private-repo:ci-jdk17","imagePullPolicy":"IfNotPresent","name":"jdk","ports":[{"containerPort":8080,"protocol":"TCP"}]}],"restartPolicy":"Always"}}}}
+  creationTimestamp: "2026-01-23T04:40:33Z"
+  generation: 18
+  name: dev-integration
+  namespace: dev-vm
+  resourceVersion: "15252016"
+  uid: 502167dd-29d4-41b7-867a-ac78a2c0fe27
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: dev-integration
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/restartedAt: "2026-01-26T15:26:26+09:00"
+      creationTimestamp: null
+      labels:
+        app: dev-integration
+    spec:
+      containers:
+      - args:
+        - echo "[dev-integration] debug hold"; ls -al /workspace; tail -f /dev/null
+        command:
+        - sh
+        - -lc
+        image: itecloudcenter/ite-private-repo:ci-jdk17
+        imagePullPolicy: IfNotPresent
+        name: jdk
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-01-26T09:16:23Z"
+    lastUpdateTime: "2026-01-27T00:12:57Z"
+    message: ReplicaSet "dev-integration-668d49ddbf" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  - lastTransitionTime: "2026-03-11T08:47:03Z"
+    lastUpdateTime: "2026-03-11T08:47:03Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  observedGeneration: 18
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1

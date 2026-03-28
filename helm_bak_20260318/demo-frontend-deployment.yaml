@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: demo-fe:apps/Deployment:dev-vm/demo-frontend
+    deployment.kubernetes.io/revision: "3"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{"argocd.argoproj.io/tracking-id":"demo-fe:apps/Deployment:dev-vm/demo-frontend"},"labels":{"app":"demo-frontend"},"name":"demo-frontend","namespace":"dev-vm"},"spec":{"replicas":2,"selector":{"matchLabels":{"app":"demo-frontend"}},"template":{"metadata":{"labels":{"app":"demo-frontend"}},"spec":{"containers":[{"image":"docker.io/itecloudcenter/builds:fe0014","imagePullPolicy":"IfNotPresent","livenessProbe":{"failureThreshold":3,"httpGet":{"path":"/","port":80},"initialDelaySeconds":10,"periodSeconds":20,"timeoutSeconds":2},"name":"demo-frontend","ports":[{"containerPort":80,"name":"http"}],"readinessProbe":{"failureThreshold":3,"httpGet":{"path":"/","port":80},"initialDelaySeconds":3,"periodSeconds":10,"timeoutSeconds":2},"resources":{"limits":{"cpu":"300m","memory":"256Mi"},"requests":{"cpu":"50m","memory":"64Mi"}},"volumeMounts":[{"mountPath":"/etc/nginx/conf.d/default.conf","name":"nginx-conf","subPath":"default.conf"}]}],"imagePullSecrets":[{"name":"dockerhub-creds"}],"volumes":[{"configMap":{"name":"demo-frontend-nginx-conf"},"name":"nginx-conf"}]}}}}
+  creationTimestamp: "2026-02-23T05:04:10Z"
+  generation: 3
+  labels:
+    app: demo-frontend
+  name: demo-frontend
+  namespace: dev-vm
+  resourceVersion: "15252084"
+  uid: c92ae912-bf96-4270-8444-576dd98bb63b
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 2
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: demo-frontend
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/restartedAt: "2026-02-23T08:06:44Z"
+      creationTimestamp: null
+      labels:
+        app: demo-frontend
+    spec:
+      containers:
+      - image: docker.io/itecloudcenter/builds:fe0014
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /
+            port: 80
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 20
+          successThreshold: 1
+          timeoutSeconds: 2
+        name: demo-frontend
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /
+            port: 80
+            scheme: HTTP
+          initialDelaySeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 2
+        resources:
+          limits:
+            cpu: 300m
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/nginx/conf.d/default.conf
+          name: nginx-conf
+          subPath: default.conf
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+      - name: dockerhub-creds
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: demo-frontend-nginx-conf
+        name: nginx-conf
+status:
+  availableReplicas: 2
+  conditions:
+  - lastTransitionTime: "2026-02-23T08:06:30Z"
+    lastUpdateTime: "2026-02-23T08:06:56Z"
+    message: ReplicaSet "demo-frontend-5bfcb9f7db" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  - lastTransitionTime: "2026-03-11T08:47:05Z"
+    lastUpdateTime: "2026-03-11T08:47:05Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  observedGeneration: 3
+  readyReplicas: 2
+  replicas: 2
+  updatedReplicas: 2

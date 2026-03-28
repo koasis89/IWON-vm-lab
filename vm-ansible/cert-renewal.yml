@@ -1,0 +1,423 @@
+---
+# =============================================================
+# cert-renewal.yml
+# Let's Encrypt 인증서 발급 → PFX 변환 → Key Vault import →
+# App Gateway SSL 갱신 → HTTP→HTTPS 리다이렉트 복구
+#
+# 사전 조건:
+#   - was01 이 App Gateway 백엔드 풀(was-backend-pool)에 등록되어 있어야 함
+#   - 도메인 A 레코드가 App Gateway 공인 IP 를 가리켜야 함
+#   - 실행 환경(로컬 또는 bastion)에 azure-cli 가 설치·로그인되어 있어야 함
+#
+# 실행 예시:
+#   ansible-playbook -i inventory.ini cert-renewal.yml
+#   ansible-playbook -i inventory.ini cert-renewal.yml --tags certbot      # 인증서 발급만
+#   ansible-playbook -i inventory.ini cert-renewal.yml --tags keyvault     # KV import만
+#   ansible-playbook -i inventory.ini cert-renewal.yml --tags appgw        # AppGW 갱신만
+#   ansible-playbook -i inventory.ini cert-renewal.yml --tags verify       # HTTPS 검증만
+#   ansible-playbook -i inventory.ini cert-renewal.yml --tags autoupdate   # 자동갱신 hook 설치만
+# =============================================================
+
+# ── 1. App Gateway HTTP 규칙 전환 (redirect → passthrough) ────────────────
+- name: App Gateway HTTP 규칙을 certbot passthrough 모드로 전환
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [certbot, appgw_prep]
+  vars_files:
+    - group_vars/all.yml
+    - group_vars/azure.yml
+  tasks:
+    - name: 기존 http-redirect-rule 제거
+      ansible.builtin.command: >
+        az network application-gateway rule delete
+        -g {{ az_resource_group }}
+        --gateway-name {{ az_appgw_name }}
+        --name http-redirect-rule
+      failed_when: false          # 이미 없으면 무시
+      changed_when: true
+
+    - name: 임시 HTTP backend-temp 규칙 생성 (was01:8080 passthrough)
+      ansible.builtin.command: >
+        az network application-gateway rule create
+        -g {{ az_resource_group }}
+        --gateway-name {{ az_appgw_name }}
+        --name http-backend-temp
+        --http-listener http-listener
+        --address-pool was-backend-pool
+        --http-settings was-http-settings
+        --priority 10
+        --rule-type Basic
+      register: appgw_temp_rule
+      changed_when: appgw_temp_rule.rc == 0
+
+# ── 2. was01: certbot 임시 웹서버 구동 + 인증서 발급 ─────────────────────
+- name: was01 에서 Let's Encrypt 인증서 발급
+  hosts: was
+  become: true
+  gather_facts: false
+  tags: [certbot]
+  vars_files:
+    - group_vars/all.yml
+    - group_vars/azure.yml
+  tasks:
+    - name: certbot 패키지 설치
+      ansible.builtin.apt:
+        name: certbot
+        state: present
+        update_cache: true
+
+    - name: webroot 디렉터리 생성
+      ansible.builtin.file:
+        path: "{{ certbot_webroot }}"
+        state: directory
+        mode: "0755"
+
+    - name: 기존 임시 HTTP 서버 프로세스 종료 (있을 경우)
+      ansible.builtin.command: pkill -f "python3 -m http.server {{ certbot_http_port }}"
+      failed_when: false
+      changed_when: false
+
+    - name: 임시 HTTP 서버 시작 (포트 {{ certbot_http_port }})
+      ansible.builtin.shell: >
+        nohup python3 -m http.server {{ certbot_http_port }}
+        --directory {{ certbot_webroot }}
+        >/tmp/certbot-http.log 2>&1 &
+      changed_when: false
+
+    - name: HTTP 서버 바인딩 대기 (최대 10초)
+      ansible.builtin.wait_for:
+        port: "{{ certbot_http_port }}"
+        timeout: 10
+
+    - name: Let's Encrypt 인증서 발급 (webroot 방식)
+      ansible.builtin.command: >
+        certbot certonly
+        --webroot -w {{ certbot_webroot }}
+        --non-interactive
+        --agree-tos
+        --register-unsafely-without-email
+        {% for d in certbot_domains %}-d {{ d }} {% endfor %}
+        --keep-until-expiring
+      register: certbot_result
+      changed_when: "'Certificate not yet due for renewal' not in certbot_result.stdout"
+
+    - name: certbot 결과 출력
+      ansible.builtin.debug:
+        var: certbot_result.stdout_lines
+
+    - name: PFX 변환 (openssl pkcs12)
+      ansible.builtin.command: >
+        openssl pkcs12 -export
+        -out {{ certbot_pfx_remote }}
+        -inkey /etc/letsencrypt/live/{{ certbot_domains[0] }}/privkey.pem
+        -in /etc/letsencrypt/live/{{ certbot_domains[0] }}/fullchain.pem
+        -passout pass:{{ certbot_pfx_password }}
+      changed_when: true
+
+    - name: PFX 를 청크별 base64 로 분할하여 로컬로 가져오기
+      # 바이너리 전송 시 손상을 방지하므로 fetch 대신 slurp 사용
+      ansible.builtin.slurp:
+        src: "{{ certbot_pfx_remote }}"
+      register: pfx_slurp
+
+    - name: 로컬 PFX 파일 저장
+      ansible.builtin.copy:
+        content: "{{ pfx_slurp.content | b64decode }}"
+        dest: "{{ certbot_pfx_local }}"
+        mode: "0600"
+      delegate_to: localhost
+
+    - name: 임시 HTTP 서버 종료
+      ansible.builtin.command: pkill -f "python3 -m http.server {{ certbot_http_port }}"
+      failed_when: false
+      changed_when: false
+
+# ── 3. Key Vault import ────────────────────────────────────────────────────
+- name: Key Vault 에 Let's Encrypt 인증서 import
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [keyvault]
+  vars_files:
+    - group_vars/all.yml
+    - group_vars/azure.yml
+  tasks:
+    - name: Key Vault 인증서 import
+      ansible.builtin.command: >
+        az keyvault certificate import
+        --vault-name {{ az_keyvault_name }}
+        --name {{ az_kv_cert_name }}
+        --file {{ certbot_pfx_local }}
+        --password "{{ certbot_pfx_password }}"
+      register: kv_import
+      changed_when: kv_import.rc == 0
+
+    - name: import 된 인증서 SID 조회
+      ansible.builtin.command: >
+        az keyvault certificate show
+        --vault-name {{ az_keyvault_name }}
+        --name {{ az_kv_cert_name }}
+        --query sid -o tsv
+      register: kv_cert_sid
+      changed_when: false
+
+    - name: SID 확인
+      ansible.builtin.debug:
+        msg: "Key Vault SID: {{ kv_cert_sid.stdout }}"
+
+# ── 4. App Gateway SSL 인증서 갱신 ────────────────────────────────────────
+- name: App Gateway SSL 인증서를 신규 Key Vault SID 로 갱신
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [keyvault, appgw]
+  vars_files:
+    - group_vars/all.yml
+    - group_vars/azure.yml
+  tasks:
+    - name: App Gateway ssl-cert 업데이트
+      ansible.builtin.command: >
+        az network application-gateway ssl-cert update
+        -g {{ az_resource_group }}
+        --gateway-name {{ az_appgw_name }}
+        -n {{ az_kv_cert_name }}
+        --key-vault-secret-id {{ kv_cert_sid.stdout }}
+      register: appgw_ssl_update
+      changed_when: appgw_ssl_update.rc == 0
+
+    - name: provisioningState 확인
+      ansible.builtin.command: >
+        az network application-gateway ssl-cert show
+        -g {{ az_resource_group }}
+        --gateway-name {{ az_appgw_name }}
+        -n {{ az_kv_cert_name }}
+        --query provisioningState -o tsv
+      register: ssl_state
+      retries: 5
+      delay: 10
+      until: ssl_state.stdout == "Succeeded"
+      changed_when: false
+
+    - name: SSL 갱신 결과
+      ansible.builtin.debug:
+        msg: "App Gateway SSL provisioningState: {{ ssl_state.stdout }}"
+
+# ── 5. App Gateway HTTP 규칙 복구 (redirect 복원) ─────────────────────────
+- name: App Gateway HTTP 규칙을 HTTPS 리다이렉트로 복구
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [appgw, appgw_restore]
+  vars_files:
+    - group_vars/all.yml
+    - group_vars/azure.yml
+  tasks:
+    - name: 임시 http-backend-temp 규칙 제거
+      ansible.builtin.command: >
+        az network application-gateway rule delete
+        -g {{ az_resource_group }}
+        --gateway-name {{ az_appgw_name }}
+        --name http-backend-temp
+      failed_when: false
+      changed_when: true
+
+    - name: http-redirect-rule 복구 (80 → HTTPS 리다이렉트)
+      ansible.builtin.command: >
+        az network application-gateway rule create
+        -g {{ az_resource_group }}
+        --gateway-name {{ az_appgw_name }}
+        --name http-redirect-rule
+        --http-listener http-listener
+        --redirect-config http-to-https
+        --priority 10
+        --rule-type Basic
+      register: restore_rule
+      changed_when: restore_rule.rc == 0
+
+    - name: App Gateway 최종 규칙 목록 확인
+      ansible.builtin.command: >
+        az network application-gateway rule list
+        -g {{ az_resource_group }}
+        --gateway-name {{ az_appgw_name }}
+        --query "[].{name:name,priority:priority,ruleType:ruleType}" -o table
+      register: rule_list
+      changed_when: false
+
+    - name: 규칙 목록 출력
+      ansible.builtin.debug:
+        var: rule_list.stdout_lines
+
+# ── 6. (선택) 로컬 임시 PFX 파일 삭제 ────────────────────────────────────
+- name: 로컬 임시 PFX 파일 정리
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [cleanup]
+  vars_files:
+    - group_vars/all.yml
+    - group_vars/azure.yml
+  tasks:
+    - name: 로컬 PFX 삭제
+      ansible.builtin.file:
+        path: "{{ certbot_pfx_local }}"
+        state: absent
+      when: certbot_cleanup_local_pfx | default(true)
+
+# ── 7. HTTPS 접속 검증 + 인증서 체인/만료일 확인 ──────────────────────────
+- name: HTTPS 접속 및 인증서 정보 검증
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [verify]
+  vars_files:
+    - group_vars/all.yml
+    - group_vars/azure.yml
+  tasks:
+    - name: HTTPS 200 응답 확인 ({{ certbot_domains[0] }})
+      ansible.builtin.uri:
+        url: "https://{{ certbot_domains[0] }}"
+        method: GET
+        validate_certs: true
+        status_code: [200, 301, 302, 304]
+        timeout: 15
+      register: https_check
+      retries: 3
+      delay: 10
+      until: https_check.status in [200, 301, 302, 304]
+
+    - name: HTTPS 응답 상태 출력
+      ansible.builtin.debug:
+        msg: "HTTPS 응답: {{ https_check.status }} (url={{ https_check.url }})"
+
+    - name: TLS 인증서 체인 · 만료일 조회 (openssl)
+      ansible.builtin.shell: |
+        echo | openssl s_client \
+          -connect {{ certbot_domains[0] }}:443 \
+          -servername {{ certbot_domains[0] }} \
+          -showcerts 2>/dev/null \
+        | openssl x509 -noout \
+          -subject -issuer -dates -fingerprint -sha256
+      register: cert_info
+      changed_when: false
+
+    - name: 인증서 정보 출력
+      ansible.builtin.debug:
+        var: cert_info.stdout_lines
+
+    - name: 인증서 만료일 파싱
+      ansible.builtin.shell: |
+        echo | openssl s_client \
+          -connect {{ certbot_domains[0] }}:443 \
+          -servername {{ certbot_domains[0] }} 2>/dev/null \
+        | openssl x509 -noout -enddate 2>/dev/null \
+        | sed 's/notAfter=//'
+      register: cert_expiry
+      changed_when: false
+
+    - name: 만료일 경고 출력 (30일 이내)
+      ansible.builtin.shell: |
+        expiry=$(date -d "{{ cert_expiry.stdout }}" +%s 2>/dev/null \
+                || date -jf "%b %d %T %Y %Z" "{{ cert_expiry.stdout }}" +%s)
+        now=$(date +%s)
+        days_left=$(( (expiry - now) / 86400 ))
+        echo "만료까지 남은 일수: ${days_left}일 (만료일: {{ cert_expiry.stdout }})"
+        [ "$days_left" -le 30 ] && echo "[WARNING] 30일 이내 만료 - 갱신 필요!" || true
+      register: expiry_check
+      changed_when: false
+
+    - name: 만료일 상태 출력
+      ansible.builtin.debug:
+        var: expiry_check.stdout_lines
+
+    - name: HTTP → HTTPS 리다이렉트 확인 (301/302 응답)
+      ansible.builtin.uri:
+        url: "http://{{ certbot_domains[0] }}"
+        method: GET
+        validate_certs: false
+        follow_redirects: none
+        status_code: [301, 302]
+        timeout: 15
+      register: redirect_check
+
+    - name: 리다이렉트 결과 출력
+      ansible.builtin.debug:
+        msg: "HTTP→HTTPS 리다이렉트: {{ redirect_check.status }} → {{ redirect_check.location | default('(location 없음)') }}"
+
+# ── 8. certbot 자동갱신 후 Key Vault · App Gateway 자동 반영 설정 ─────────
+- name: certbot 자동갱신 deploy hook 설치 (was01)
+  hosts: was
+  become: true
+  gather_facts: false
+  tags: [autoupdate]
+  vars_files:
+    - group_vars/all.yml
+    - group_vars/azure.yml
+  tasks:
+    - name: azure-cli 설치 확인
+      ansible.builtin.command: az version --output none
+      register: az_check
+      changed_when: false
+      failed_when: false
+
+    - name: azure-cli 설치 (없는 경우)
+      ansible.builtin.shell: |
+        curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+      when: az_check.rc != 0
+      changed_when: true
+
+    - name: az login 서비스 주체 자격증명 디렉터리 생성
+      ansible.builtin.file:
+        path: /etc/iwon
+        state: directory
+        mode: "0700"
+        owner: root
+        group: root
+
+    - name: Azure SP 자격증명 파일 배포
+      ansible.builtin.template:
+        src: roles/certbot_autoupdate/templates/az-sp-env.sh.j2
+        dest: /etc/iwon/az-sp-env.sh
+        mode: "0600"
+        owner: root
+        group: root
+
+    - name: deploy hook 스크립트 배포
+      ansible.builtin.template:
+        src: roles/certbot_autoupdate/templates/deploy-hook.sh.j2
+        dest: /etc/letsencrypt/renewal-hooks/deploy/10-azure-update.sh
+        mode: "0750"
+        owner: root
+        group: root
+
+    - name: deploy hook 동작 검증 (dry-run)
+      ansible.builtin.command: bash -n /etc/letsencrypt/renewal-hooks/deploy/10-azure-update.sh
+      changed_when: false
+
+    - name: certbot renew dry-run 실행
+      ansible.builtin.command:
+        cmd: certbot renew --dry-run --quiet
+      register: dry_run
+      changed_when: false
+      failed_when: dry_run.rc != 0
+
+    - name: dry-run 결과 출력
+      ansible.builtin.debug:
+        var: dry_run.stdout_lines
+
+    - name: systemd certbot 타이머 활성화
+      ansible.builtin.systemd:
+        name: certbot.timer
+        enabled: true
+        state: started
+      failed_when: false  # certbot.timer 없는 경우 무시
+
+    - name: certbot 자동갱신 cron 등록 (timer 없는 경우 폴백)
+      ansible.builtin.cron:
+        name: "certbot renew"
+        minute: "30"
+        hour: "3"
+        weekday: "1"
+        job: >-
+          certbot renew --quiet
+          >> /var/log/certbot-renew.log 2>&1

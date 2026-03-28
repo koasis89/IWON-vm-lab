@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    pv.kubernetes.io/provisioned-by: cluster.local/nfs-provisioner-nfs-subdir-external-provisioner
+  creationTimestamp: "2026-03-11T01:11:55Z"
+  finalizers:
+  - kubernetes.io/pv-protection
+  name: pvc-fce63bf4-453c-4dfa-96f7-43b26df37ee3
+  resourceVersion: "15159874"
+  uid: 142e9058-6079-4404-b115-54743f25fa53
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 10Gi
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: iwon-pvc
+    namespace: dev-vm
+    resourceVersion: "15159870"
+    uid: fce63bf4-453c-4dfa-96f7-43b26df37ee3
+  nfs:
+    path: /nfs/data/dev-vm-iwon-pvc-pvc-fce63bf4-453c-4dfa-96f7-43b26df37ee3
+    server: 192.168.0.109
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: nfs-client
+  volumeMode: Filesystem
+status:
+  lastPhaseTransitionTime: "2026-03-11T01:11:55Z"
+  phase: Bound

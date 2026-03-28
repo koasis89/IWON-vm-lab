@@ -1,0 +1,59 @@
+root@563d7c2b5c05:/workspace/helm# helm install mariadb bitnami/mariadb \
+  -n mariadb \
+  --create-namespace \
+  -f mariadb-values.yaml
+NAME: mariadb
+LAST DEPLOYED: Mon Jan 19 01:34:08 2026
+NAMESPACE: mariadb
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+CHART NAME: mariadb
+CHART VERSION: 24.0.3
+APP VERSION: 12.1.2
+
+⚠ WARNING: Since August 28th, 2025, only a limited subset of images/charts are available for free.
+    Subscribe to Bitnami Secure Images to receive continued support and security updates.
+    More info at https://bitnami.com and https://github.com/bitnami/containers/issues/83267
+
+** Please be patient while the chart is being deployed **
+
+Tip:
+
+  Watch the deployment status using the command: kubectl get pods -w --namespace mariadb -l app.kubernetes.io/instance=mariadb
+
+Services:
+
+  echo Primary: mariadb.mariadb.svc.cluster.local:3306
+
+Administrator credentials:
+
+  Username: root
+  Password : $(kubectl get secret --namespace mariadb mariadb -o jsonpath="{.data.mariadb-root-password}" | base64 -d)
+
+To connect to your database, create a client pod:
+
+    kubectl run mariadb-client --rm --tty -i --restart='Never' --image  registry-1.docker.io/bitnami/mariadb:latest --namespace mariadb --command -- bash
+
+To connect to primary service (read/write):
+
+    mysql -h mariadb.mariadb.svc.cluster.local -uroot -p appdb
+
+To upgrade this helm chart:
+
+  1. Obtain the password as described on the 'Administrator credentials' section and set the 'auth.rootPassword' parameter as shown below:
+
+      ROOT_PASSWORD=$(kubectl get secret --namespace mariadb mariadb -o jsonpath="{.data.mariadb-root-password}" | base64 -d)
+      helm upgrade --namespace mariadb mariadb oci://MY-OCI-REGISTRY/mariadb --set auth.rootPassword=$ROOT_PASSWORD
+WARNING: Rolling tag detected (bitnami/mariadb:latest), please note that it is strongly recommended to avoid using rolling tags in a production environment.
++info https://techdocs.broadcom.com/us/en/vmware-tanzu/application-catalog/tanzu-application-catalog/services/tac-doc/apps-tutorials-understand-rolling-tags-containers-index.html
+WARNING: Rolling tag detected (bitnami/mysqld-exporter:latest), please note that it is strongly recommended to avoid using rolling tags in a production environment.
++info https://techdocs.broadcom.com/us/en/vmware-tanzu/application-catalog/tanzu-application-catalog/services/tac-doc/apps-tutorials-understand-rolling-tags-containers-index.html
+WARNING: Rolling tag detected (bitnami/os-shell:latest), please note that it is strongly recommended to avoid using rolling tags in a production environment.
++info https://techdocs.broadcom.com/us/en/vmware-tanzu/application-catalog/tanzu-application-catalog/services/tac-doc/apps-tutorials-understand-rolling-tags-containers-index.html
+
+WARNING: There are "resources" sections in the chart not set. Using "resourcesPreset" is not recommended for production. For production installations, please set the following values according to your workload needs:
+  - primary.resources
+  - secondary.resources
++info https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/

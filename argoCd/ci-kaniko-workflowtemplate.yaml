@@ -1,0 +1,256 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: unified-ci
+  namespace: argo
+spec:
+  entrypoint: pipeline
+  serviceAccountName: argo-workflow
+
+  arguments:
+    parameters:
+      # Git
+      - name: git_repo
+        description: "https://github.com/org/repo.git"
+      - name: git_ref
+        value: "main"
+        description: "branch, tag, or commit hash"
+      - name: git_username
+        description: "GitHub username or email"
+        value: ""
+      - name: git_password
+        description: "GitHub password or Personal Access Token (PAT)"
+        value: ""   # GitHub는 계정 비밀번호 대신 PAT(토큰) 사용 권장
+
+      # Build type
+      - name: project_type
+        description: "Type of the project to build (fe | java)"
+        value: "fe" # fe | java
+
+      # Image destination
+      - name: image
+        description: "DockerHub image name (e.g., username/repo)"
+        value: "itecloudcenter/ite-private-repo"
+      - name: tag
+        description: "Docker image tag"
+        value: "build-{{workflow.uid}}"
+
+      # Common builder images (DockerHub에 올려둔 공용 이미지)
+      - name: node_builder_image
+        value: "itecloudcenter/ite-private-repo:ci-node20"
+      - name: jdk_builder_image
+        value: "itecloudcenter/ite-private-repo:ci-jdk17"
+
+      # Runtime base images (DockerHub에 올려둔 공용 런타임 이미지)
+      - name: nginx_base_image
+        value: "itecloudcenter/ite-private-repo:runtime-nginx"
+      - name: jre_base_image
+        value: "itecloudcenter/ite-private-repo:runtime-jre17"
+
+      # FE output dir (프로젝트에 따라 dist/build 등 변경)
+      - name: fe_output_dir
+        description: "Frontend build output directory"
+        value: "dist"  # CRA면 build 로 변경
+
+      # Java build options
+      - name: java_skip_tests
+        description: "Skip tests during Java build (true | false)"
+        value: "true"  # true면 테스트 스킵
+
+  volumeClaimTemplates:
+    - metadata:
+        name: work
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: nfs-client
+        resources:
+          requests:
+            storage: 6Gi
+
+  templates:
+    - name: pipeline
+      steps:
+        - - name: clone
+            template: git-clone
+        - - name: build
+            template: build-by-type
+        - - name: image
+            template: build-and-push
+
+    # 1) Git Clone (UI에서 ID/PW 입력받아 private repo clone)
+    - name: git-clone
+      container:
+        image: alpine/git:2.45.2
+        command: [sh, -lc]
+        args:
+          - |
+            set -e
+            set +x
+
+            cd /work
+            rm -rf src
+
+            REPO="{{workflow.parameters.git_repo}}"
+            REF="{{workflow.parameters.git_ref}}"
+            USER="{{workflow.parameters.git_username}}"
+            PASS="{{workflow.parameters.git_password}}"
+
+            if [ -z "$USER" ] || [ -z "$PASS" ]; then
+              echo "ERROR: git_username/git_password is empty. Provide them in Argo UI."
+              exit 1
+            fi
+
+            # https://github.com/org/repo.git -> https://USER:PASS@github.com/org/repo.git
+            AUTH_REPO="$(echo "$REPO" | sed "s#^https://#https://${USER}:${PASS}@#")"
+
+            git clone "$AUTH_REPO" src
+            cd src
+            git checkout "$REF"
+
+        volumeMounts:
+          - name: work
+            mountPath: /work
+
+    # 2) Build by type
+    #    - FE: node로 빌드 산출물 생성 + 런타임 Dockerfile 작성
+    #    - Java: gradle/maven 자동 판별 빌드 + app.jar 추출 + 런타임 Dockerfile 작성
+    - name: build-by-type
+      container:
+        image: alpine:3.20
+        command: [sh, -lc]
+        args:
+          - |
+            set -e
+
+            TYPE="{{workflow.parameters.project_type}}"
+            FE_OUT="{{workflow.parameters.fe_output_dir}}"
+            SKIP_TESTS="{{workflow.parameters.java_skip_tests}}"
+
+            cd /work/src
+
+            if [ "$TYPE" = "fe" ]; then
+              echo "[CI] FE build with Node image: {{workflow.parameters.node_builder_image}}"
+
+              # Node 빌드
+              docker run --rm \
+                -v /work/src:/app \
+                -w /app \
+                "{{workflow.parameters.node_builder_image}}" \
+                sh -lc "npm ci && npm run build"
+
+              if [ ! -d "/work/src/${FE_OUT}" ]; then
+                echo "ERROR: FE output dir not found: /work/src/${FE_OUT}"
+                echo "TIP: fe_output_dir parameter should be 'dist' or 'build'"
+                ls -al /work/src
+                exit 1
+              fi
+
+              # FE 런타임 Dockerfile 생성 (nginx base는 build-arg로 주입)
+              cat > /work/Dockerfile.runtime <<'EOF'
+              ARG NGINX_BASE
+              FROM ${NGINX_BASE}
+              COPY src/OUTPUT_DIR/ /usr/share/nginx/html/
+              EXPOSE 80
+              CMD ["nginx","-g","daemon off;"]
+              EOF
+
+              # OUTPUT_DIR 치환
+              sed -i "s#OUTPUT_DIR#${FE_OUT}#g" /work/Dockerfile.runtime
+
+              echo "[CI] FE runtime Dockerfile created."
+              echo "----- /work/Dockerfile.runtime -----"
+              sed -n '1,120p' /work/Dockerfile.runtime
+
+            else
+              echo "[CI] Java build with JDK image: {{workflow.parameters.jdk_builder_image}}"
+
+              # Gradle/Maven 자동 판별 실행 커맨드 구성
+              if [ "$SKIP_TESTS" = "true" ]; then
+                GRADLE_CMD="./gradlew clean build -x test || gradle clean build -x test"
+                MAVEN_CMD="./mvnw -B -DskipTests package || mvn -B -DskipTests package"
+              else
+                GRADLE_CMD="./gradlew clean build || gradle clean build"
+                MAVEN_CMD="./mvnw -B package || mvn -B package"
+              fi
+
+              docker run --rm \
+                -v /work/src:/app \
+                -w /app \
+                "{{workflow.parameters.jdk_builder_image}}" \
+                sh -lc '
+                  set -e
+                  if [ -f "./gradlew" ]; then
+                    echo "[CI] Detected Gradle wrapper"
+                    '"$GRADLE_CMD"'
+                  elif [ -f "./pom.xml" ] || [ -f "./mvnw" ]; then
+                    echo "[CI] Detected Maven"
+                    '"$MAVEN_CMD"'
+                  else
+                    echo "ERROR: Cannot detect build tool (no gradlew / pom.xml / mvnw)."
+                    exit 1
+                  fi
+                '
+
+              # jar 찾기(Gradle: build/libs, Maven: target)
+              JAR="$(ls /work/src/build/libs/*.jar 2>/dev/null | head -n1 || true)"
+              if [ -z "$JAR" ]; then
+                JAR="$(ls /work/src/target/*.jar 2>/dev/null | head -n1 || true)"
+              fi
+
+              if [ -z "$JAR" ]; then
+                echo "ERROR: jar not found under build/libs or target"
+                find /work/src -maxdepth 3 -type f -name "*.jar" -ls || true
+                exit 1
+              fi
+
+              cp "$JAR" /work/app.jar
+              echo "[CI] app.jar prepared: $JAR -> /work/app.jar"
+              ls -al /work/app.jar
+
+              # Java 런타임 Dockerfile 생성 (jre base는 build-arg로 주입)
+              cat > /work/Dockerfile.runtime <<'EOF'
+              ARG JRE_BASE
+              FROM ${JRE_BASE}
+              WORKDIR /app
+              COPY app.jar /app/app.jar
+              EXPOSE 8080
+              ENTRYPOINT ["java","-jar","/app/app.jar"]
+              EOF
+
+              echo "[CI] Java runtime Dockerfile created."
+              echo "----- /work/Dockerfile.runtime -----"
+              sed -n '1,120p' /work/Dockerfile.runtime
+            fi
+        volumeMounts:
+          - name: work
+            mountPath: /work
+      # 이 단계는 docker run을 사용합니다.
+      # 클러스터에서 docker 데몬이 없으면 동작하지 않습니다.
+      # (권장: node/jdk 빌드도 kaniko/ko/buildkit 등으로 바꾸거나, dind/host-docker를 준비)
+
+    # 3) Build runtime image and push to DockerHub (kaniko)
+    - name: build-and-push
+      container:
+        image: gcr.io/kaniko-project/executor:latest
+        command: ["/kaniko/executor"]
+        args:
+          - "--context=/work"
+          - "--dockerfile=/work/Dockerfile.runtime"
+          # - "--destination=docker.io/{{workflow.parameters.image}}:{{workflow.parameters.tag}}"
+          # 수정 (Harbor IP 사용)
+          - --destination={{workflow.parameters.image_repo}}:{{inputs.parameters.tag}}
+          - "--build-arg=NGINX_BASE={{workflow.parameters.nginx_base_image}}"
+          - "--build-arg=JRE_BASE={{workflow.parameters.jre_base_image}}"
+          - "--verbosity=info"
+        volumeMounts:
+          - name: work
+            mountPath: /work
+          - name: docker-config
+            mountPath: /kaniko/.docker/
+      volumes:
+        - name: docker-config
+          secret:
+            secretName: dockerhub-creds
+            items:
+              - key: .dockerconfigjson
+                path: config.json

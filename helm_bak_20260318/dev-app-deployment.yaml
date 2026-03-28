@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "6"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"name":"dev-app","namespace":"dev-vm"},"spec":{"replicas":1,"selector":{"matchLabels":{"app":"dev-app"}},"template":{"metadata":{"labels":{"app":"dev-app"}},"spec":{"containers":[{"args":["echo \"[dev-app] container started\"\ntail -f /dev/null\n"],"command":["sh","-lc"],"image":"itecloudcenter/ite-private-repo:ci-jdk17","imagePullPolicy":"IfNotPresent","name":"jdk","ports":[{"containerPort":8080}],"stdin":true,"tty":true}]}}}}
+  creationTimestamp: "2026-01-19T10:43:22Z"
+  generation: 6
+  name: dev-app
+  namespace: dev-vm
+  resourceVersion: "15503424"
+  uid: c7a73f19-286a-4edc-812d-8207fea609ff
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: dev-app
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: dev-app
+    spec:
+      containers:
+      - args:
+        - |
+          echo "[dev-app] container started"
+          tail -f /dev/null
+        command:
+        - sh
+        - -lc
+        image: itecloudcenter/ite-private-repo:ci-jdk17
+        imagePullPolicy: IfNotPresent
+        name: jdk
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources: {}
+        stdin: true
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        tty: true
+        volumeMounts:
+        - mountPath: /app/uploads
+          name: app-storage
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: app-storage
+        persistentVolumeClaim:
+          claimName: iwon-pvc
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-03-11T08:47:03Z"
+    lastUpdateTime: "2026-03-11T08:47:03Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-01-19T10:43:22Z"
+    lastUpdateTime: "2026-03-12T04:55:28Z"
+    message: ReplicaSet "dev-app-8577f47fcc" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 6
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1

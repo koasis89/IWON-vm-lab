@@ -1,0 +1,7 @@
+FROM node:20-alpine
+
+USER root
+RUN apk add --no-cache git bash curl ca-certificates openssh-client
+
+WORKDIR /workspace
+CMD ["sh"]

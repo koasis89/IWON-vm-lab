@@ -1,0 +1,18 @@
+root@563d7c2b5c05:/workspace/helm# helm install argo-workflows argo/argo-workflows \
+  -n argo \
+  --create-namespace \
+  -f argo-workflows-values.yaml
+NAME: argo-workflows
+LAST DEPLOYED: Mon Jan 19 03:12:18 2026
+NAMESPACE: argo
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+1. Get Argo Server external IP/domain by running:
+
+kubectl --namespace argo get services -o wide | grep argo-workflows-server
+
+2. Submit the hello-world workflow by running:
+
+argo submit https://raw.githubusercontent.com/argoproj/argo-workflows/master/examples/hello-world.yaml --watch

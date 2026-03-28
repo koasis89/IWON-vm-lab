@@ -1,0 +1,64 @@
+apiVersion: v1
+items:
+- apiVersion: kafka.strimzi.io/v1
+  kind: Kafka
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"kafka.strimzi.io/v1","kind":"Kafka","metadata":{"annotations":{},"name":"dev-kafka","namespace":"dev-vm"},"spec":{"entityOperator":{"topicOperator":{},"userOperator":{}},"kafka":{"config":{"default.replication.factor":1,"min.insync.replicas":1,"offsets.topic.replication.factor":1,"transaction.state.log.min.isr":1,"transaction.state.log.replication.factor":1},"listeners":[{"name":"plain","port":9092,"tls":false,"type":"internal"}],"version":"4.1.1"}}}
+    creationTimestamp: "2026-01-26T02:21:05Z"
+    generation: 1
+    name: dev-kafka
+    namespace: dev-vm
+    resourceVersion: "10662496"
+    uid: 3cf5b95b-3b9a-466d-b070-d3f89401c705
+  spec:
+    entityOperator:
+      topicOperator: {}
+      userOperator: {}
+    kafka:
+      config:
+        default.replication.factor: 1
+        min.insync.replicas: 1
+        offsets.topic.replication.factor: 1
+        transaction.state.log.min.isr: 1
+        transaction.state.log.replication.factor: 1
+      listeners:
+      - name: plain
+        port: 9092
+        tls: false
+        type: internal
+      version: 4.1.1
+  status:
+    clusterId: cvDMqcDkROyScxT2EZ-HFw
+    conditions:
+    - lastTransitionTime: "2026-02-24T00:19:54.119861570Z"
+      message: A Kafka cluster with a single broker node and ephemeral storage will
+        lose topic messages after any restart or rolling update.
+      reason: KafkaStorage
+      status: "True"
+      type: Warning
+    - lastTransitionTime: "2026-02-24T00:19:54.119868355Z"
+      message: A Kafka cluster with a single controller node and ephemeral storage
+        will lose data after any restart or rolling update.
+      reason: KafkaStorage
+      status: "True"
+      type: Warning
+    - lastTransitionTime: "2026-02-24T00:21:20.024290344Z"
+      status: "True"
+      type: Ready
+    kafkaMetadataVersion: 4.1-IV1
+    kafkaNodePools:
+    - name: pool1
+    kafkaVersion: 4.1.1
+    listeners:
+    - addresses:
+      - host: dev-kafka-kafka-bootstrap.dev-vm.svc
+        port: 9092
+      bootstrapServers: dev-kafka-kafka-bootstrap.dev-vm.svc:9092
+      name: plain
+    observedGeneration: 1
+    operatorLastSuccessfulVersion: 0.50.0
+kind: List
+metadata:
+  resourceVersion: ""

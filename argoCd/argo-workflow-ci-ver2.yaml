@@ -1,0 +1,359 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: workflow-ci-ver3
+  namespace: argo
+spec:
+  entrypoint: pipeline
+  serviceAccountName: argo-workflow
+
+  # 태그 증분 충돌 방지(앱+prefix 단위로 락)
+  synchronization:
+    mutex:
+      name: "tag-{{workflow.parameters.image_name}}-{{workflow.parameters.tag_prefix}}"
+
+  arguments:
+    parameters:
+      - name: git_repo
+      - name: git_ref
+        value: main
+      - name: git_username
+        value: ""
+      - name: git_password
+        value: ""
+
+      # 단일 repo에 여러 디렉토리일 수 있으니 선택 경로 받기
+      - name: project_dir
+        value: "."   # 예: fe/, api/
+
+      - name: project_type
+        value: fe    # fe | java
+
+      # 사용자가 설정할 “이미지 이름”(고정 리포지토리: itecloudcenter/builds)
+      - name: image_name
+        value: portal-fe
+
+      # prefix 입력 
+      - name: tag_prefix
+        value: fe
+
+      # manifest repo 정보
+      - name: manifest_repo
+        value: https://github.com/ORG/manifest-repo.git
+      - name: manifest_dir
+        value: apps/portal-fe  # manifest repo 내 앱 디렉토리
+      - name: manifest_ref
+        value: main
+
+      # FE output
+      - name: fe_output_dir
+        value: dist
+
+      # base images
+      - name: node_builder_image
+        value: itecloudcenter/ite-private-repo:ci-node20
+      - name: jdk_builder_image
+        value: itecloudcenter/ite-private-repo:ci-jdk17
+      - name: nginx_base_image
+        value: itecloudcenter/ite-private-repo:runtime-nginx
+      - name: jre_base_image
+        value: itecloudcenter/ite-private-repo:runtime-jre17
+
+  templates:
+    - name: pipeline
+      steps:
+        - - name: clone-source
+            template: git-clone
+            arguments:
+              parameters:
+                - name: repo
+                  value: "{{workflow.parameters.git_repo}}"
+                - name: ref
+                  value: "{{workflow.parameters.git_ref}}"
+                - name: out
+                  value: "src"
+
+        - - name: clone-manifest
+            template: git-clone
+            arguments:
+              parameters:
+                - name: repo
+                  value: "{{workflow.parameters.manifest_repo}}"
+                - name: ref
+                  value: "{{workflow.parameters.manifest_ref}}"
+                - name: out
+                  value: "manifest"
+
+        - - name: bump-tag
+            template: bump-tag-in-manifest
+            arguments:
+              parameters:
+                - name: app_dir
+                  value: "{{workflow.parameters.manifest_dir}}"
+                - name: prefix
+                  value: "{{workflow.parameters.tag_prefix}}"
+
+        - - name: build-fe
+            template: build-fe
+            when: "{{workflow.parameters.project_type}} == fe"
+
+        - - name: build-java
+            template: build-java
+            when: "{{workflow.parameters.project_type}} == java"
+
+        - - name: kaniko-push
+            template: build-and-push
+
+        - - name: update-manifest
+            template: update-manifest-and-push
+            arguments:
+              parameters:
+                - name: app_dir
+                  value: "{{workflow.parameters.manifest_dir}}"
+                - name: image_repo
+                  value: "10.0.2.12/library"
+                - name: image_name
+                  value: "{{workflow.parameters.image_name}}"
+                - name: tag
+                  value: "{{steps.bump-tag.outputs.parameters.next_tag}}"
+
+    # 공용 git clone (PAT)
+    - name: git-clone
+      inputs:
+        parameters:
+          - name: repo
+          - name: ref
+          - name: out
+      container:
+        image: alpine/git:2.45.2
+        command: [sh, -lc]
+        args: |
+          set -e
+          cd /work
+          rm -rf "{{inputs.parameters.out}}"
+
+          REPO="{{inputs.parameters.repo}}"
+          REF="{{inputs.parameters.ref}}"
+          OUT="{{inputs.parameters.out}}"
+          USER="{{workflow.parameters.git_username}}"
+          PASS="{{workflow.parameters.git_password}}"
+
+          git config --global credential.helper store
+          mkdir -p /root
+          printf "https://%s:%s@github.com/\n" "$USER" "$PASS" > /root/.git-credentials
+
+          git clone "$REPO" "$OUT"
+          cd "$OUT"
+          git fetch --all --tags
+          git checkout "$REF"
+      volumeMounts:
+        - name: work
+          mountPath: /work
+
+    # manifest repo에 카운터 파일로 prefix0001 생성
+    - name: bump-tag-in-manifest
+      inputs:
+        parameters:
+          - name: app_dir
+          - name: prefix
+      outputs:
+        parameters:
+          - name: next_tag
+            valueFrom:
+              path: /work/next_tag.txt
+      container:
+        image: alpine:3.20
+        command: [sh, -lc]
+        args: |
+          set -e
+          cd /work/manifest/"{{inputs.parameters.app_dir}}"
+
+          PREFIX="{{inputs.parameters.prefix}}"
+          VERSION_FILE=".version-${PREFIX}.txt"
+
+          if [ ! -f "$VERSION_FILE" ]; then
+            echo "0000" > "$VERSION_FILE"
+          fi
+
+          LAST="$(cat "$VERSION_FILE" | tr -d '\r\n' || echo 0000)"
+          # 숫자만 보장
+          LAST_NUM="$(echo "$LAST" | sed 's/[^0-9]//g')"
+          [ -z "$LAST_NUM" ] && LAST_NUM="0000"
+
+          NEXT_NUM=$((10#$LAST_NUM + 1))
+          NEXT_TAG="$(printf "%s%04d" "$PREFIX" "$NEXT_NUM")"
+
+          # 파일 업데이트(숫자만 저장)
+          printf "%04d" "$NEXT_NUM" > "$VERSION_FILE"
+
+          echo "$NEXT_TAG" > /work/next_tag.txt
+
+          echo "[INFO] next tag = $NEXT_TAG (file: $VERSION_FILE)"
+          ls -al
+          cat "$VERSION_FILE"
+      volumeMounts:
+        - name: work
+          mountPath: /work
+
+    # FE build: project_dir 기준
+    - name: build-fe
+      container:
+        image: "{{workflow.parameters.node_builder_image}}"
+        command: [sh, -lc]
+        args: |
+          set -e
+          cd /work/src/"{{workflow.parameters.project_dir}}"
+
+          npm ci
+          npm run build
+
+          FE_OUT="{{workflow.parameters.fe_output_dir}}"
+          if [ ! -d "/work/src/{{workflow.parameters.project_dir}}/${FE_OUT}" ]; then
+            echo "ERROR: FE output dir not found: ${FE_OUT}"
+            exit 1
+          fi
+
+          # runtime dockerfile
+          cat > /work/Dockerfile.runtime <<'EOF'
+          ARG NGINX_BASE
+          FROM ${NGINX_BASE}
+          COPY src/APP_DIR/OUTPUT_DIR/ /usr/share/nginx/html/
+          EXPOSE 80
+          CMD ["nginx","-g","daemon off;"]
+          EOF
+
+          # 치환
+          sed -i "s#APP_DIR#{{workflow.parameters.project_dir}}#g" /work/Dockerfile.runtime
+          sed -i "s#OUTPUT_DIR#${FE_OUT}#g" /work/Dockerfile.runtime
+      volumeMounts:
+        - name: work
+          mountPath: /work
+
+    # Java build: project_dir 기준
+    - name: build-java
+      container:
+        image: "{{workflow.parameters.jdk_builder_image}}"
+        command: [sh, -lc]
+        args: |
+          set -e
+          cd /work/src/"{{workflow.parameters.project_dir}}"
+
+          # Gradle/Maven 감지
+          if [ -f "./gradlew" ]; then
+            ./gradlew clean build -x test || gradle clean build -x test
+          elif [ -f "./pom.xml" ] || [ -f "./mvnw" ]; then
+            ./mvnw -B -DskipTests package || mvn -B -DskipTests package
+          else
+            echo "ERROR: cannot detect build tool"
+            exit 1
+          fi
+
+          JAR="$(ls build/libs/*.jar 2>/dev/null | head -n1 || true)"
+          if [ -z "$JAR" ]; then
+            JAR="$(ls target/*.jar 2>/dev/null | head -n1 || true)"
+          fi
+          [ -z "$JAR" ] && echo "ERROR: jar not found" && exit 1
+
+          cp "$JAR" /work/app.jar
+
+          cat > /work/Dockerfile.runtime <<'EOF'
+          ARG JRE_BASE
+          FROM ${JRE_BASE}
+          WORKDIR /app
+          COPY app.jar /app/app.jar
+          EXPOSE 8080
+          ENTRYPOINT ["java","-jar","/app/app.jar"]
+          EOF
+      volumeMounts:
+        - name: work
+          mountPath: /work
+
+    # Kaniko push: itecloudcenter/builds:{prefix0001}
+    - name: build-and-push
+      container:
+        image: gcr.io/kaniko-project/executor:latest
+        command: [/kaniko/executor]
+        args:
+          - --context=/work
+          - --dockerfile=/work/Dockerfile.runtime
+          # - --destination=docker.io/itecloudcenter/builds:{{steps.bump-tag.outputs.parameters.next_tag}}
+          # 수정 후 (Harbor 주소로 직행):
+          - --destination=10.0.2.12/library/app:{{steps.bump-tag.outputs.parameters.next_tag}}
+          - --build-arg=NGINX_BASE={{workflow.parameters.nginx_base_image}}
+          - --build-arg=JRE_BASE={{workflow.parameters.jre_base_image}}
+          - --verbosity=info
+        volumeMounts:
+          - name: work
+            mountPath: /work
+          - name: docker-config
+            mountPath: /kaniko/.docker/
+
+    # manifest 업데이트 + commit/push
+    - name: update-manifest-and-push
+      inputs:
+        parameters:
+          - name: app_dir
+          - name: image_repo
+          - name: image_name
+          - name: tag
+      container:
+        image: alpine/git:2.45.2
+        command: [sh, -lc]
+        args: |
+          set -e
+          cd /work/manifest
+
+          # manifest 디렉토리로 이동
+          cd "{{inputs.parameters.app_dir}}"
+
+          IMAGE_REPO="{{inputs.parameters.image_repo}}"
+          TAG="{{inputs.parameters.tag}}"
+
+          # 예: values.yaml에서 image.repository / image.tag 갱신(파일 구조는 필요시 맞춰드림)
+          if [ ! -f "values.yaml" ]; then
+            echo "ERROR: values.yaml not found in {{inputs.parameters.app_dir}}"
+            exit 1
+          fi
+
+          # 단순 sed (구조가 고정일 때)
+          # image:
+          #   repository: itecloudcenter/builds
+          #   tag: fe0001
+          sed -i "s#^\(\s*repository:\s*\).*#\1${IMAGE_REPO}#g" values.yaml
+          sed -i "s#^\(\s*tag:\s*\).*#\1${TAG}#g" values.yaml
+
+          echo "[INFO] updated values.yaml"
+          grep -nE "repository:|tag:" values.yaml || true
+
+          cd /work/manifest
+          git status
+
+          git config user.name "argo-workflow"
+          git config user.email "argo-workflow@local"
+
+          git add -A
+          git commit -m "deploy: ${IMAGE_REPO}:${TAG}" || true
+
+          # push (PAT credentials는 git-clone에서 설정한 store를 그대로 씀)
+          git push
+      volumeMounts:
+        - name: work
+          mountPath: /work
+
+  volumes:
+    - name: docker-config
+      secret:
+        secretName: harbor-creds
+        items:
+          - key: .dockerconfigjson
+            path: config.json
+
+  volumeClaimTemplates:
+    - metadata:
+        name: work
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 6Gi
+        storageClassName: nfs-client

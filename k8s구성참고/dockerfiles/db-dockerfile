@@ -1,0 +1,12 @@
+FROM mariadb:latest
+
+# Use the latest official MariaDB image at build time.
+# The official entrypoint executes *.sql files in this directory
+# on first container startup when the data directory is empty.
+COPY backup/db/all.sql /docker-entrypoint-initdb.d/01-all.sql
+
+# Keep the original Helm backup/reference files in the image as well.
+COPY backup/db/values.yaml /opt/backup/db/values.yaml
+COPY backup/db/USER-SUPPLIED VALUES.txt /opt/backup/db/USER-SUPPLIED VALUES.txt
+
+EXPOSE 3306

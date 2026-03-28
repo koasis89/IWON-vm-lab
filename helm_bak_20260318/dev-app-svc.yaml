@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"name":"dev-app-svc","namespace":"dev-vm"},"spec":{"ports":[{"name":"ssh","nodePort":32222,"port":22,"targetPort":22},{"name":"http8080","nodePort":32280,"port":8080,"targetPort":8080}],"selector":{"app":"dev-app"},"type":"NodePort"}}
+  creationTimestamp: "2026-01-19T10:43:22Z"
+  name: dev-app-svc
+  namespace: dev-vm
+  resourceVersion: "807019"
+  uid: 3c61eaa2-2960-4d8a-b03d-6d5485f8d2fd
+spec:
+  clusterIP: 10.104.84.130
+  clusterIPs:
+  - 10.104.84.130
+  externalTrafficPolicy: Cluster
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: ssh
+    nodePort: 32222
+    port: 22
+    protocol: TCP
+    targetPort: 22
+  - name: http8080
+    nodePort: 32280
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: dev-app
+  sessionAffinity: None
+  type: NodePort
+status:
+  loadBalancer: {}

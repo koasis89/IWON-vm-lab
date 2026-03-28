@@ -1,0 +1,276 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-web-nginx
+  namespace: dev-vm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dev-web-nginx
+  template:
+    metadata:
+      labels:
+        app: dev-web-nginx
+    spec:
+      containers:
+        - name: nginx
+          image: itecloudcenter/ite-private-repo:runtime-nginx
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: ssh
+              containerPort: 22
+            - name: http
+              containerPort: 80
+          command: ["sh", "-lc"]
+          args:
+            - |
+              set -e
+
+              # 1) user 생성 (없으면 생성)
+              id iteyes >/dev/null 2>&1 || useradd -m -s /bin/bash iteyes
+
+              # 2) 비밀번호 설정
+              echo 'iteyes:<CHANGE_ME_ADMIN_PASSWORD>' | chpasswd
+
+              # 3) sudo 권한 부여 (NOPASSWD)
+              mkdir -p /etc/sudoers.d
+              echo 'iteyes ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/iteyes
+              chmod 440 /etc/sudoers.d/iteyes
+
+              # 4) sshd 설정(패스워드 로그인 허용)
+              mkdir -p /var/run/sshd
+              (grep -q '^PasswordAuthentication' /etc/ssh/sshd_config && sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config) || echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config
+              (grep -q '^PermitRootLogin' /etc/ssh/sshd_config && sed -i 's/^PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config) || echo 'PermitRootLogin no' >> /etc/ssh/sshd_config
+
+              # 5) hostkey 없으면 생성
+              ssh-keygen -A || true
+
+              # 6) sshd 백그라운드 실행
+              /usr/sbin/sshd
+
+              # 7) nginx 포그라운드
+              nginx -g 'daemon off;'
+          stdin: true
+          tty: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dev-web-nginx-svc
+  namespace: dev-vm
+spec:
+  type: NodePort
+  selector:
+    app: dev-web-nginx
+  ports:
+    - name: ssh
+      port: 22
+      targetPort: 22
+      nodePort: 32022
+    - name: http
+      port: 80
+      targetPort: 80
+      nodePort: 32080
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-was
+  namespace: dev-vm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dev-was
+  template:
+    metadata:
+      labels:
+        app: dev-was
+    spec:
+      containers:
+        - name: jdk
+          image: itecloudcenter/ite-private-repo:ci-jdk17
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: ssh
+              containerPort: 22
+            - name: http8080
+              containerPort: 8080
+          command: ["sh", "-lc"]
+          args:
+            - |
+              set -e
+
+              id iteyes >/dev/null 2>&1 || useradd -m -s /bin/bash iteyes
+              echo 'iteyes:<CHANGE_ME_ADMIN_PASSWORD>' | chpasswd
+
+              mkdir -p /etc/sudoers.d
+              echo 'iteyes ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/iteyes
+              chmod 440 /etc/sudoers.d/iteyes
+
+              mkdir -p /var/run/sshd
+              (grep -q '^PasswordAuthentication' /etc/ssh/sshd_config && sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config) || echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config
+              (grep -q '^PermitRootLogin' /etc/ssh/sshd_config && sed -i 's/^PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config) || echo 'PermitRootLogin no' >> /etc/ssh/sshd_config
+
+              ssh-keygen -A || true
+              /usr/sbin/sshd
+
+              # 앱/was 실행은 나중에 교체하세요. 지금은 VM처럼 유지
+              tail -f /dev/null
+          stdin: true
+          tty: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dev-was-svc
+  namespace: dev-vm
+spec:
+  type: NodePort
+  selector:
+    app: dev-was
+  ports:
+    - name: ssh
+      port: 22
+      targetPort: 22
+      nodePort: 32122
+    - name: http8080
+      port: 8080
+      targetPort: 8080
+      nodePort: 32180
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-app
+  namespace: dev-vm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dev-app
+  template:
+    metadata:
+      labels:
+        app: dev-app
+    spec:
+      containers:
+        - name: jdk
+          image: itecloudcenter/ite-private-repo:ci-jdk17
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: ssh
+              containerPort: 22
+            - name: http8080
+              containerPort: 8080
+          command: ["sh", "-lc"]
+          args:
+            - |
+              set -e
+
+              id iteyes >/dev/null 2>&1 || useradd -m -s /bin/bash iteyes
+              echo 'iteyes:<CHANGE_ME_ADMIN_PASSWORD>' | chpasswd
+
+              mkdir -p /etc/sudoers.d
+              echo 'iteyes ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/iteyes
+              chmod 440 /etc/sudoers.d/iteyes
+
+              mkdir -p /var/run/sshd
+              (grep -q '^PasswordAuthentication' /etc/ssh/sshd_config && sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config) || echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config
+              (grep -q '^PermitRootLogin' /etc/ssh/sshd_config && sed -i 's/^PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config) || echo 'PermitRootLogin no' >> /etc/ssh/sshd_config
+
+              ssh-keygen -A || true
+              /usr/sbin/sshd
+
+              tail -f /dev/null
+          stdin: true
+          tty: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dev-app-svc
+  namespace: dev-vm
+spec:
+  type: NodePort
+  selector:
+    app: dev-app
+  ports:
+    - name: ssh
+      port: 22
+      targetPort: 22
+      nodePort: 32222
+    - name: http8080
+      port: 8080
+      targetPort: 8080
+      nodePort: 32280
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-smartcontract
+  namespace: dev-vm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dev-smartcontract
+  template:
+    metadata:
+      labels:
+        app: dev-smartcontract
+    spec:
+      containers:
+        - name: jdk
+          image: itecloudcenter/ite-private-repo:ci-jdk17
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: ssh
+              containerPort: 22
+            - name: http8080
+              containerPort: 8080
+          command: ["sh", "-lc"]
+          args:
+            - |
+              set -e
+
+              id iteyes >/dev/null 2>&1 || useradd -m -s /bin/bash iteyes
+              echo 'iteyes:<CHANGE_ME_ADMIN_PASSWORD>' | chpasswd
+
+              mkdir -p /etc/sudoers.d
+              echo 'iteyes ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/iteyes
+              chmod 440 /etc/sudoers.d/iteyes
+
+              mkdir -p /var/run/sshd
+              (grep -q '^PasswordAuthentication' /etc/ssh/sshd_config && sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config) || echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config
+              (grep -q '^PermitRootLogin' /etc/ssh/sshd_config && sed -i 's/^PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config) || echo 'PermitRootLogin no' >> /etc/ssh/sshd_config
+
+              ssh-keygen -A || true
+              /usr/sbin/sshd
+
+              tail -f /dev/null
+          stdin: true
+          tty: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dev-smartcontract-svc
+  namespace: dev-vm
+spec:
+  type: NodePort
+  selector:
+    app: dev-smartcontract
+  ports:
+    - name: ssh
+      port: 22
+      targetPort: 22
+      nodePort: 32322
+    - name: http8080
+      port: 8080
+      targetPort: 8080
+      nodePort: 32380

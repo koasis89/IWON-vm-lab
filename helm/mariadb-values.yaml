@@ -1,0 +1,17 @@
+architecture: standalone
+
+auth:
+  rootPassword: "<CHANGE_ME_ROOT_PASSWORD>"
+  database: "appdb"
+  username: "appuser"
+  password: "<CHANGE_ME_APP_PASSWORD>"
+
+primary:
+  service:
+    type: NodePort
+    nodePorts:
+      mysql: "30306"
+
+  persistence:
+    enabled: true
+    storageClass: "nfs-client"

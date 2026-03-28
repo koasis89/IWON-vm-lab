@@ -1,0 +1,49 @@
+# =============================================================
+# group_vars/azure.yml
+# Azure 리소스 관련 변수 (cert-renewal.yml 에서 사용)
+# 민감한 값(패스워드 등)은 ansible-vault 로 암호화 권장:
+#   ansible-vault encrypt group_vars/azure.yml
+# =============================================================
+
+# ── Azure 공통 ────────────────────────────────────────────────
+az_resource_group: iwon-svc-rg
+az_appgw_name:     iwon-svc-appgw
+az_keyvault_name:  iwonsvckvkrc001
+az_kv_cert_name:   iwon-web-tls-cert
+az_appgw_url_path_map_name: main-path-map
+az_web_backend_pool_name: web-backend-pool
+az_web_backend_ip: 10.0.2.10
+az_web_http_settings_name: web-http-settings
+az_web_probe_name: web-http-probe
+az_web_backend_port: 80
+
+# ── certbot 설정 ──────────────────────────────────────────────
+certbot_domains:
+  - iwon-smart.site
+  - www.iwon-smart.site
+
+# App Gateway 가 was01:PORT 로 ACME challenge를 전달하는 포트
+certbot_http_port: 8080
+
+# was01 내부 PFX 임시 경로
+certbot_pfx_remote: /tmp/iwon-smart.pfx
+
+# 플레이북 실행 환경(로컬)의 PFX 저장 경로
+certbot_pfx_local: "{{ playbook_dir }}/tmp/iwon-smart.pfx"
+
+# PFX export 패스워드 (ansible-vault 로 암호화 권장)
+certbot_pfx_password: "TempPfx2026!"
+
+# certbot webroot 경로 (was01 상)
+certbot_webroot: /var/www/certbot
+
+# 플레이북 완료 후 로컬 PFX 파일 삭제 여부
+certbot_cleanup_local_pfx: true
+
+# ── Azure Service Principal (자동갱신 deploy hook 용) ─────────────────────
+# was01 에 배포되는 /etc/iwon/az-sp-env.sh 에서 사용
+# 엄호화 필수: ansible-vault encrypt group_vars/azure.yml
+az_sp_tenant_id:       "REPLACE_WITH_TENANT_ID"
+az_sp_client_id:       "REPLACE_WITH_CLIENT_ID"
+az_sp_client_secret:   "REPLACE_WITH_CLIENT_SECRET"
+az_sp_subscription_id: "REPLACE_WITH_SUBSCRIPTION_ID"

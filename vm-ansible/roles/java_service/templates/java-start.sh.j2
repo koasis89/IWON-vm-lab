@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd {{ java_app_dir }}
+exec java -jar {{ java_app_dir }}/{{ java_jar_remote_name }} >> {{ java_log_file }} 2>&1

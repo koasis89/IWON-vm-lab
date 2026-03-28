@@ -1,0 +1,19 @@
+[Unit]
+Description={{ java_service_description }}
+After=network.target
+
+[Service]
+Type=simple
+User={{ service_user }}
+WorkingDirectory={{ java_app_dir }}
+{% if java_env_vars is defined and java_env_vars | length > 0 %}
+{% for item in java_env_vars | dictsort %}
+Environment="{{ item.0 }}={{ item.1 }}"
+{% endfor %}
+{% endif %}
+ExecStart={{ scripts_dir }}/start-{{ java_service_name }}.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

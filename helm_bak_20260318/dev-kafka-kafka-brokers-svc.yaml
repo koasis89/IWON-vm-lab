@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: "2026-01-26T02:21:06Z"
+  labels:
+    app.kubernetes.io/instance: dev-kafka
+    app.kubernetes.io/managed-by: strimzi-cluster-operator
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/part-of: strimzi-dev-kafka
+    strimzi.io/cluster: dev-kafka
+    strimzi.io/component-type: kafka
+    strimzi.io/kind: Kafka
+    strimzi.io/name: dev-kafka-kafka
+  name: dev-kafka-kafka-brokers
+  namespace: dev-vm
+  ownerReferences:
+  - apiVersion: kafka.strimzi.io/v1beta2
+    blockOwnerDeletion: true
+    controller: false
+    kind: Kafka
+    name: dev-kafka
+    uid: 3cf5b95b-3b9a-466d-b070-d3f89401c705
+  resourceVersion: "2510406"
+  uid: 3226fc92-9ad5-4b90-b272-ac7240b88061
+spec:
+  clusterIP: None
+  clusterIPs:
+  - None
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: tcp-ctrlplane
+    port: 9090
+    protocol: TCP
+    targetPort: tcp-ctrlplane
+  - name: tcp-replication
+    port: 9091
+    protocol: TCP
+    targetPort: tcp-replication
+  - name: tcp-kafkaagent
+    port: 8443
+    protocol: TCP
+    targetPort: tcp-kafkaagent
+  - name: tcp-clients
+    port: 9092
+    protocol: TCP
+    targetPort: tcp-clients
+  publishNotReadyAddresses: true
+  selector:
+    strimzi.io/cluster: dev-kafka
+    strimzi.io/kind: Kafka
+    strimzi.io/name: dev-kafka-kafka
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}

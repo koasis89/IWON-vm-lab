@@ -1,0 +1,113 @@
+---
+- name: Install Java runtime
+  ansible.builtin.apt:
+    name: "{{ java_packages }}"
+    state: present
+    update_cache: true
+
+- name: Ensure application directory exists
+  ansible.builtin.file:
+    path: "{{ java_app_dir }}"
+    state: directory
+    owner: "{{ service_user }}"
+    group: "{{ service_user }}"
+    mode: "0755"
+
+- name: Upload service JAR
+  ansible.builtin.copy:
+    src: "{{ java_jar_local_src }}"
+    dest: "{{ java_app_dir }}/{{ java_jar_remote_name }}"
+    owner: "{{ service_user }}"
+    group: "{{ service_user }}"
+    mode: "0644"
+  notify: Restart java service
+
+- name: Upload JAR patch helper
+  ansible.builtin.copy:
+    src: patch_class_utf8.py
+    dest: "{{ scripts_dir }}/patch_class_utf8.py"
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - java_class_patch_specs is defined or (java_patch_class_path is defined and java_class_utf8_replacements is defined and java_class_utf8_replacements | length > 0)
+
+- name: Upload JAR XML patch helper
+  ansible.builtin.copy:
+    src: patch_jar_xml.py
+    dest: "{{ scripts_dir }}/patch_jar_xml.py"
+    owner: root
+    group: root
+    mode: "0755"
+  when: java_xml_gpcl_patch | default(false)
+
+- name: Patch JAR XML mappers gpcl_ -> GPCL_ (case normalization)
+  ansible.builtin.shell: >
+    python3 {{ scripts_dir }}/patch_jar_xml.py
+    --jar {{ (java_app_dir ~ '/' ~ java_jar_remote_name) | quote }}
+  register: java_xml_patch_result
+  changed_when: "'RESULT=changed' in java_xml_patch_result.stdout"
+  when: java_xml_gpcl_patch | default(false)
+  notify: Restart java service
+
+- name: Patch JAR UTF-8 constants for multiple classes
+  ansible.builtin.shell: >
+    python3 {{ scripts_dir }}/patch_class_utf8.py
+    --jar {{ (java_app_dir ~ '/' ~ java_jar_remote_name) | quote }}
+    --class {{ item.class_path | quote }}
+    {% for replacement in item.replacements %}
+    --replace {{ (replacement.old ~ '=' ~ replacement.new) | quote }}
+    {% endfor %}
+  loop: "{{ java_class_patch_specs | default([]) }}"
+  register: java_patch_results
+  changed_when: "'RESULT=changed' in java_patch_results.stdout"
+  when:
+    - java_class_patch_specs is defined
+    - java_class_patch_specs | length > 0
+  notify: Restart java service
+
+- name: Patch JAR UTF-8 constants when configured
+  ansible.builtin.shell: >
+    python3 {{ scripts_dir }}/patch_class_utf8.py
+    --jar {{ (java_app_dir ~ '/' ~ java_jar_remote_name) | quote }}
+    --class {{ java_patch_class_path | quote }}
+    {% for item in java_class_utf8_replacements %}
+    --replace {{ (item.old ~ '=' ~ item.new) | quote }}
+    {% endfor %}
+  register: java_patch_result
+  changed_when: "'RESULT=changed' in java_patch_result.stdout"
+  when:
+    - java_class_patch_specs is not defined
+    - java_patch_class_path is defined
+    - java_class_utf8_replacements is defined
+    - java_class_utf8_replacements | length > 0
+  notify: Restart java service
+
+- name: Create service start script
+  ansible.builtin.template:
+    src: java-start.sh.j2
+    dest: "{{ scripts_dir }}/start-{{ java_service_name }}.sh"
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart java service
+
+- name: Create systemd unit
+  ansible.builtin.template:
+    src: java.service.j2
+    dest: "/etc/systemd/system/{{ java_service_name }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart java service
+
+- name: Flush handlers before enabling service
+  ansible.builtin.meta: flush_handlers
+
+- name: Ensure java service is enabled
+  ansible.builtin.systemd:
+    name: "{{ java_service_name }}"
+    enabled: true
+    state: started

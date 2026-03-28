@@ -1,0 +1,14 @@
+[Unit]
+Description=Apache Kafka (KRaft Single Broker)
+After=network.target
+
+[Service]
+Type=simple
+User={{ service_user }}
+ExecStart={{ scripts_dir }}/start-kafka.sh
+Restart=always
+RestartSec=5
+LimitNOFILE=100000
+
+[Install]
+WantedBy=multi-user.target

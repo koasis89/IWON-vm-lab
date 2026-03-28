@@ -1,0 +1,458 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: workflow-ci-ver5
+  namespace: argo
+spec:
+  serviceAccountName: argo-workflow
+  entrypoint: pipeline
+
+  # 같은 counter_cm(=워크플로우/앱)로 동시에 여러 실행되면 태그 충돌나므로 락 필수
+  synchronization:
+    mutex:
+      name: "tag-counter-{{workflow.parameters.counter_cm}}"
+
+  arguments:
+    parameters:
+      # ===== Git credentials (GitHub PAT ) =====
+      - name: git_username
+        value: ""
+        description: "GitHub username"
+      - name: git_password
+        value: ""
+        description: "GitHub Personal Access Token (PAT) with repo permissions"
+
+      # ===== Source repo =====
+      - name: source_git_repo
+        description: "https://github.com/org/repo.git"
+      - name: source_git_ref
+        value: main
+        description: "branch or tag to build (e.g. main or v1.2.3)"
+
+      # 단일 repo 내 여러 디렉토리 지원 (., fe/, api/ ...)
+      - name: project_dir
+        value: "."
+        description: "project dir in source repo (e.g. ., fe, api)"
+      - name: project_type
+        value: fe  # fe | java
+        description: "type of project to build (e.g. fe(Node) or java)"
+      - name: fe_output_dir
+        value: dist
+        description: "FE output dir relative to project_dir (e.g. dist, build). Only used when project_type=fe"
+
+      # ===== Image =====
+      - name: image_repo
+        value: 10.0.2.12/library
+      - name: image_name
+        value: demo-frontend   # 논리 이름(참고용)
+      - name: tag_prefix
+        value: fe
+      - name: counter_cm
+        value: tag-counter-demo-frontend
+
+      # ===== Manifest repo (입력) =====
+      - name: manifest_git_repo
+        description: "https://github.com/org/manifest-repo.git"
+      - name: manifest_git_ref
+        value: main
+      - name: manifest_app_dir
+        value: demo-frontend   
+      - name: manifest_deployment_file
+        value: deployment.yaml
+
+      # ===== Builder / runtime base =====
+      - name: node_builder_image
+        value: itecloudcenter/ite-private-repo:ci-node20
+      - name: jdk_builder_image
+        value: itecloudcenter/ite-private-repo:ci-jdk17
+      - name: nginx_base_image
+        value: itecloudcenter/ite-private-repo:runtime-nginx
+      - name: jre_base_image
+        value: itecloudcenter/ite-private-repo:runtime-jre17
+
+      # (선택) manifest Deployment에서 특정 컨테이너만 이미지 교체하고 싶을 때
+      # 비워두면 첫 번째 컨테이너의 image를 교체합니다.
+      - name: manifest_container_name
+        value: ""
+      
+      # Mnanifest repo에 대한 git 계정 설정
+      - name: manifest_git_username
+        value: ""
+      - name: manifest_git_password
+        value: ""
+
+  templates:
+    - name: pipeline
+      steps:
+        - - name: issue-tag
+            template: issue-next-tag-auto
+            arguments:
+              parameters:
+                - name: counter_cm
+                  value: "{{workflow.parameters.counter_cm}}"
+                - name: prefix
+                  value: "{{workflow.parameters.tag_prefix}}"
+
+        - - name: clone-source
+            template: git-clone
+            arguments:
+              parameters:
+                - name: repo
+                  value: "{{workflow.parameters.source_git_repo}}"
+                - name: ref
+                  value: "{{workflow.parameters.source_git_ref}}"
+                - name: out
+                  value: "src"
+
+        - - name: clone-manifest
+            template: git-clone
+            arguments:
+              parameters:
+                - name: repo
+                  value: "{{workflow.parameters.manifest_git_repo}}"
+                - name: ref
+                  value: "{{workflow.parameters.manifest_git_ref}}"
+                - name: out
+                  value: "manifest"
+
+        - - name: build-fe
+            template: build-fe
+            when: "{{workflow.parameters.project_type}} == fe"
+
+        - - name: build-java
+            template: build-java
+            when: "{{workflow.parameters.project_type}} == java"
+
+        - - name: build-and-push
+            template: kaniko-push
+            arguments:
+              parameters:
+                - name: tag
+                  value: "{{steps.issue-tag.outputs.parameters.tag}}"
+
+        - - name: update-manifest
+            template: update-manifest-and-push
+            arguments:
+              parameters:
+                - name: image_full
+                  value: "docker.io/{{workflow.parameters.image_repo}}:{{steps.issue-tag.outputs.parameters.tag}}"
+                - name: app_dir
+                  value: "{{workflow.parameters.manifest_app_dir}}"
+                - name: deploy_file
+                  value: "{{workflow.parameters.manifest_deployment_file}}"
+                - name: container_name
+                  value: "{{workflow.parameters.manifest_container_name}}"
+                - name: tag
+                  value: "{{steps.issue-tag.outputs.parameters.tag}}"
+        - - name: commit-manifest
+            template: commit-manifest
+            arguments:
+              parameters:
+                - name: tag
+                  value: "{{steps.issue-tag.outputs.parameters.tag}}"
+
+    # ---- Git clone (PAT) ----
+    - name: git-clone
+      inputs:
+        parameters:
+          - name: repo
+          - name: ref
+          - name: out
+      container:
+        image: alpine/git:2.45.2
+        command: 
+          - sh
+          - -lc
+        args: 
+          - |
+            set -e
+            cd /work
+            rm -rf "{{inputs.parameters.out}}"
+
+            REPO="{{inputs.parameters.repo}}"
+            REF="{{inputs.parameters.ref}}"
+            OUT="{{inputs.parameters.out}}"
+            USER="{{workflow.parameters.git_username}}"
+            PASS="{{workflow.parameters.git_password}}"
+
+            if [ -z "$USER" ] || [ -z "$PASS" ]; then
+              echo "ERROR: git_username/git_password is empty"
+              exit 1
+            fi
+
+            git config --global credential.helper store
+            mkdir -p /root
+            printf "https://%s:%s@github.com/\n" "$USER" "$PASS" > /root/.git-credentials
+
+            git clone "$REPO" "$OUT"
+            cd "$OUT"
+            git fetch --all --tags
+            git checkout "$REF"
+
+            echo "[INFO] cloned $REPO ($REF) -> /work/$OUT"
+            ls -al /work/$OUT | head -n 50
+        volumeMounts:
+          - name: work
+            mountPath: /work
+
+    # ---- Tag : ConfigMap 자동 생성 + prefix0001 ----
+    - name: issue-next-tag-auto
+      inputs:
+        parameters:
+          - name: counter_cm
+          - name: prefix
+      outputs:
+        parameters:
+          - name: tag
+            valueFrom:
+              path: /tmp/tag.txt
+      container:
+        image: bitnami/kubectl:latest
+        command: [sh, -lc]
+        args:
+          - |
+            set -e
+            NS="argo"
+            CM="{{inputs.parameters.counter_cm}}"
+            PREFIX="{{inputs.parameters.prefix}}"
+
+            if ! kubectl -n "$NS" get cm "$CM" >/dev/null 2>&1; then
+              echo "[INFO] ConfigMap $CM not found. Creating with next=1"
+              kubectl -n "$NS" create cm "$CM" --from-literal=next="1"
+            fi
+
+            CUR="$(kubectl -n "$NS" get cm "$CM" -o jsonpath='{.data.next}' || true)"
+            CUR_NUM="$(echo "$CUR" | sed 's/[^0-9]//g')"
+            [ -z "$CUR_NUM" ] && CUR_NUM="1"
+
+            TAG="$(printf "%s%04d" "$PREFIX" "$CUR_NUM")"
+            echo "$TAG" > /tmp/tag.txt
+
+            NEXT_NUM=$((10#$CUR_NUM + 1))
+            kubectl -n "$NS" patch cm "$CM" --type merge -p "{\"data\":{\"next\":\"$NEXT_NUM\"}}"
+
+            echo "[INFO] issued tag=$TAG, next=$NEXT_NUM (cm=$CM)"
+
+    # ---- FE build (project_dir 기준) ----
+    - name: build-fe
+      container:
+        image: "{{workflow.parameters.node_builder_image}}"
+        command: [sh, -lc]
+        args:
+          - |
+            set -e
+            cd /work/src/"{{workflow.parameters.project_dir}}"
+
+            npm ci
+            npm run build
+
+            FE_OUT="{{workflow.parameters.fe_output_dir}}"
+            if [ ! -d "/work/src/{{workflow.parameters.project_dir}}/${FE_OUT}" ]; then
+              echo "ERROR: FE output dir not found: /work/src/{{workflow.parameters.project_dir}}/${FE_OUT}"
+              exit 1
+            fi
+
+            cat > /work/Dockerfile.runtime <<'EOF'
+            ARG NGINX_BASE
+            FROM ${NGINX_BASE}
+            COPY src/APP_DIR/OUTPUT_DIR/ /usr/share/nginx/html/
+            EXPOSE 80
+            CMD ["nginx","-g","daemon off;"]
+            EOF
+
+            sed -i "s#APP_DIR#{{workflow.parameters.project_dir}}#g" /work/Dockerfile.runtime
+            sed -i "s#OUTPUT_DIR#${FE_OUT}#g" /work/Dockerfile.runtime
+
+            echo "[INFO] Dockerfile.runtime created"
+            sed -n '1,120p' /work/Dockerfile.runtime
+        volumeMounts:
+          - name: work
+            mountPath: /work
+
+    # ---- Java build (project_dir 기준) ----
+    - name: build-java
+      container:
+        image: "{{workflow.parameters.jdk_builder_image}}"
+        command: [sh, -lc]
+        args:
+          - |
+            set -e
+            cd /work/src/"{{workflow.parameters.project_dir}}"
+
+            if [ -f "./gradlew" ]; then
+              ./gradlew clean build -x test || gradle clean build -x test
+            elif [ -f "./pom.xml" ] || [ -f "./mvnw" ]; then
+              ./mvnw -B -DskipTests package || mvn -B -DskipTests package
+            else
+              echo "ERROR: cannot detect build tool (no gradlew/pom.xml/mvnw)"
+              exit 1
+            fi
+
+            JAR="$(ls build/libs/*.jar 2>/dev/null | head -n1 || true)"
+            if [ -z "$JAR" ]; then
+              JAR="$(ls target/*.jar 2>/dev/null | head -n1 || true)"
+            fi
+            [ -z "$JAR" ] && echo "ERROR: jar not found" && exit 1
+
+            cp "$JAR" /work/app.jar
+
+            cat > /work/Dockerfile.runtime <<'EOF'
+            ARG JRE_BASE
+            FROM ${JRE_BASE}
+            WORKDIR /app
+            COPY app.jar /app/app.jar
+            EXPOSE 8080
+            ENTRYPOINT ["java","-jar","/app/app.jar"]
+            EOF
+
+            echo "[INFO] Dockerfile.runtime created"
+            sed -n '1,120p' /work/Dockerfile.runtime
+        volumeMounts:
+          - name: work
+            mountPath: /work
+
+    # ---- Kaniko push ----
+    - name: kaniko-push
+      inputs:
+        parameters:
+          - name: tag
+      container:
+        image: gcr.io/kaniko-project/executor:latest
+        command: [/kaniko/executor]
+        args:
+          - --context=/work
+          - --dockerfile=/work/Dockerfile.runtime
+          - --destination=docker.io/{{workflow.parameters.image_repo}}:{{inputs.parameters.tag}}
+          - --build-arg=NGINX_BASE={{workflow.parameters.nginx_base_image}}
+          - --build-arg=JRE_BASE={{workflow.parameters.jre_base_image}}
+          - --verbosity=info
+        volumeMounts:
+          - name: work
+            mountPath: /work
+          - name: docker-config
+            mountPath: /kaniko/.docker/
+
+    # ---- Manifest update (deployment.yaml image 교체) + git push ----
+    - name: update-manifest-and-push
+      inputs:
+        parameters:
+          - name: image_full
+          - name: app_dir
+          - name: deploy_file
+          - name: container_name
+          - name: tag
+      container:
+        image: mikefarah/yq:4
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+        command: [sh, -lc]
+        args:
+          - |
+            set -e
+            cd /work/manifest
+
+            APP_DIR="{{inputs.parameters.app_dir}}"
+            DEPLOY="{{inputs.parameters.deploy_file}}"
+            IMG="{{inputs.parameters.image_full}}"
+            CNAME="{{inputs.parameters.container_name}}"
+
+            export IMG CNAME
+
+            [ -z "$IMG" ] && echo "ERROR: image_full is empty" && exit 1
+
+            if [ ! -d "$APP_DIR" ]; then
+              echo "ERROR: manifest app dir not found: $APP_DIR"
+              ls -al
+              exit 1
+            fi
+
+            cd "$APP_DIR"
+
+            if [ ! -f "$DEPLOY" ]; then
+              echo "ERROR: deployment file not found: $APP_DIR/$DEPLOY"
+              ls -al
+              exit 1
+            fi
+
+            echo "[INFO] before:"
+            yq e '.spec.template.spec.containers[].image' "$DEPLOY" || true
+
+            if [ -n "$CNAME" ]; then
+              # 특정 컨테이너 이름만 교체
+              yq e -i '(.spec.template.spec.containers[] | select(.name == strenv(CNAME)) | .image) = strenv(IMG)' "$DEPLOY"
+            else
+              # 첫 번째 컨테이너 이미지 교체
+              yq e -i '.spec.template.spec.containers[0].image = strenv(IMG)' "$DEPLOY"
+            fi
+
+            echo "[INFO] after:"
+            yq e '.spec.template.spec.containers[].image' "$DEPLOY"
+
+            cd /work/manifest
+
+        volumeMounts:
+          - name: work
+            mountPath: /work
+
+    # ---- Commit & push (git 포함 이미지로 수행) ----
+    - name: commit-manifest
+      inputs:
+        parameters:
+          - name: tag
+          
+      container:
+        image: alpine/git:2.45.2
+        command: [sh, -lc]
+        args:
+          - |
+            USER="{{workflow.parameters.manifest_git_username}}"
+            PASS="{{workflow.parameters.manifest_git_password}}"
+
+            # override git credentials if manifest_git_username/password provided, otherwise use source repo credentials
+            [ -z "$USER" ] && USER="{{workflow.parameters.git_username}}"
+            [ -z "$PASS" ] && PASS="{{workflow.parameters.git_password}}"
+
+            if [ -z "$USER" ] || [ -z "$PASS" ]; then
+              echo "ERROR: manifest git credentials are empty"
+              exit 1
+            fi
+
+            git config --global credential.helper store
+            mkdir -p /root
+            printf "https://%s:%s@github.com/\n" "$USER" "$PASS" > /root/.git-credentials
+            
+            set -e
+            cd /work/manifest
+
+            git status
+
+            git config user.name "hyunsoloh"
+            git config user.email "hyunsoloh@gmail.com"
+
+            git add -A
+            git commit -m "deploy: {{workflow.parameters.image_repo}}:{{inputs.parameters.tag}}" || true
+            git push
+
+        volumeMounts:
+          - name: work
+            mountPath: /work
+
+
+  volumes:
+    - name: docker-config
+      secret:
+        secretName: harbor-creds
+        items:
+          - key: .dockerconfigjson
+            path: config.json
+
+  volumeClaimTemplates:
+    - metadata:
+        name: work
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 6Gi
+        storageClassName: nfs-client

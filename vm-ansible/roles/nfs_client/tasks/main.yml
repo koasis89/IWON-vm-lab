@@ -1,0 +1,48 @@
+---
+- name: Skip when NFS mount is disabled
+  ansible.builtin.meta: end_host
+  when: not nfs_mount_enabled or nfs_storage_account | length == 0 or nfs_share_name | length == 0
+
+- name: Install NFS client
+  ansible.builtin.apt:
+    name: nfs-common
+    state: present
+    update_cache: true
+
+- name: Install aznfs client package
+  ansible.builtin.shell: |
+    set -euo pipefail
+    distro="$(. /etc/os-release && echo "${ID}/${VERSION_ID}")"
+    curl -sSL "https://packages.microsoft.com/config/${distro}/packages-microsoft-prod.deb" -o /tmp/packages-microsoft-prod.deb
+    dpkg -i /tmp/packages-microsoft-prod.deb
+    rm -f /tmp/packages-microsoft-prod.deb
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y aznfs
+  args:
+    executable: /bin/bash
+    creates: /usr/sbin/mount.aznfs
+  when: ansible_facts["os_family"] == "Debian"
+
+- name: Ensure mount path exists
+  ansible.builtin.file:
+    path: "{{ nfs_mount_path }}"
+    state: directory
+    owner: "{{ service_user }}"
+    group: "{{ service_user }}"
+    mode: "0755"
+
+- name: Remove legacy NFS mount entry
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: "^{{ nfs_storage_account }}\\.(privatelink\\.)?file\\.core\\.windows\\.net:/.*\\s+{{ nfs_mount_path }}\\s+(nfs4|aznfs).*$"
+    state: absent
+
+- name: Configure NFS mount
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    line: "{{ nfs_storage_account }}.file.core.windows.net:/{{ nfs_storage_account }}/{{ nfs_share_name }} {{ nfs_mount_path }} aznfs defaults,vers=4,minorversion=1,sec=sys,nconnect=4,noatime,_netdev 0 0"
+    create: true
+
+- name: Mount NFS share
+  ansible.builtin.command: mount -a
+  changed_when: false

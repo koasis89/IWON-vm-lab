@@ -1,0 +1,17 @@
+# /etc/iwon/az-sp-env.sh
+# Azure Service Principal 자격증명 환경변수
+# 이 파일은 root:root 600 권한으로 보호됩니다.
+# ansible-vault 로 암호화하여 저장하는 것을 권장합니다.
+#
+# SP 생성 명령 예시:
+#   az ad sp create-for-rbac \
+#     --name "certbot-kv-appgw" \
+#     --role "Key Vault Certificates Officer" \
+#     --scopes /subscriptions/<SUB_ID>/resourceGroups/{{ az_resource_group }} \
+#     --role "Contributor" \
+#     --scopes /subscriptions/<SUB_ID>/resourceGroups/{{ az_resource_group }}
+
+export AZURE_TENANT_ID="{{ az_sp_tenant_id }}"
+export AZURE_CLIENT_ID="{{ az_sp_client_id }}"
+export AZURE_CLIENT_SECRET="{{ az_sp_client_secret }}"
+export AZURE_SUBSCRIPTION_ID="{{ az_sp_subscription_id }}"

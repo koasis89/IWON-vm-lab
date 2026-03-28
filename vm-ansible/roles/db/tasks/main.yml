@@ -1,0 +1,180 @@
+---
+- name: Install MariaDB repo prerequisites
+  ansible.builtin.apt:
+    name:
+      - curl
+      - ca-certificates
+      - gnupg
+    state: present
+    update_cache: true
+
+- name: Configure MariaDB 12.1 repository
+  ansible.builtin.shell: |
+    curl -LsS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash -s -- --mariadb-server-version=12.1
+  args:
+    creates: /etc/apt/sources.list.d/mariadb.list
+
+- name: Install MariaDB server
+  ansible.builtin.apt:
+    name: mariadb-server
+    state: present
+    update_cache: true
+
+- name: Configure MariaDB bind address
+  ansible.builtin.copy:
+    dest: /etc/mysql/mariadb.conf.d/60-appdb.cnf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [mysqld]
+      bind-address = {{ db_bind_address }}
+      lower_case_table_names = {{ db_lower_case_table_names }}
+  notify: Restart mariadb
+
+- name: Ensure MariaDB is enabled and started
+  ansible.builtin.systemd:
+    name: mariadb
+    enabled: true
+    state: started
+
+- name: Flush MariaDB handlers before SQL steps
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify lower_case_table_names policy
+  ansible.builtin.shell: |
+    mariadb -h 127.0.0.1 -u root -p'{{ db_root_password }}' -Nse "SHOW VARIABLES LIKE 'lower_case_table_names';"
+  register: db_lctn_result
+  changed_when: false
+
+- name: Assert lower_case_table_names policy is applied
+  ansible.builtin.assert:
+    that:
+      - db_lctn_result.stdout is search('^lower_case_table_names\\s+' ~ (db_lower_case_table_names | string) ~ '$')
+    fail_msg: "Expected lower_case_table_names={{ db_lower_case_table_names }} but got: {{ db_lctn_result.stdout }}"
+    success_msg: "lower_case_table_names={{ db_lower_case_table_names }} is applied"
+
+- name: Ensure DB helper artifacts are present
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: "{{ service_user }}"
+    group: "{{ service_user }}"
+    mode: "{{ item.mode | default('0644') }}"
+  loop:
+    - { src: "{{ db_sql_src }}", dest: "{{ vm_lab_root }}/all.sql" }
+    - { src: "{{ db_values_yaml_src }}", dest: "{{ vm_lab_root }}/values.yaml" }
+    - { src: "{{ db_user_values_src }}", dest: "{{ vm_lab_root }}/USER-SUPPLIED VALUES.txt" }
+    - { src: "{{ db_fix_script_src }}", dest: "{{ vm_lab_root }}/fix-mariadb-collation.sh", mode: "0755" }
+
+- name: Upload gpcl table case normalization helper
+  ansible.builtin.copy:
+    src: normalize_gpcl_table_case.py
+    dest: "{{ scripts_dir }}/normalize_gpcl_table_case.py"
+    owner: root
+    group: root
+    mode: "0755"
+  when: db_enable_case_compat | bool
+
+- name: Create application database
+  ansible.builtin.shell: |
+    mariadb -h 127.0.0.1 -u root -p'{{ db_root_password }}' -e "CREATE DATABASE IF NOT EXISTS {{ db_name }};"
+  changed_when: false
+
+# '%' + db_extra_hosts 의 모든 패턴에 대해 계정 생성 및 권한 부여
+- name: Create application user for each host pattern
+  ansible.builtin.shell: |
+    mariadb -h 127.0.0.1 -u root -p'{{ db_root_password }}' -e "
+      CREATE USER IF NOT EXISTS '{{ db_user }}'@'{{ item }}' IDENTIFIED BY '{{ db_password }}';
+      GRANT ALL PRIVILEGES ON {{ db_name }}.* TO '{{ db_user }}'@'{{ item }}';
+    "
+  loop: "{{ ['%'] + db_extra_hosts }}"
+  changed_when: false
+
+- name: Flush privileges after user creation
+  ansible.builtin.shell: |
+    mariadb -h 127.0.0.1 -u root -p'{{ db_root_password }}' -e "FLUSH PRIVILEGES;"
+  changed_when: false
+
+- name: Check whether SQL import has already completed
+  ansible.builtin.stat:
+    path: "{{ vm_lab_root }}/.{{ db_name }}_imported"
+  register: db_import_marker
+
+- name: Import SQL dump with automatic collation fix
+  when: not db_import_marker.stat.exists
+  block:
+    - name: Attempt initial SQL import
+      ansible.builtin.shell: |
+        mariadb -h 127.0.0.1 -u root -p'{{ db_root_password }}' {{ db_name }} < {{ vm_lab_root }}/all.sql
+      register: db_import_result
+      failed_when: false
+
+    - name: Run collation fix script when initial import fails
+      ansible.builtin.shell: |
+        {{ vm_lab_root }}/fix-mariadb-collation.sh {{ vm_lab_root }}/all.sql {{ db_name }} {{ db_utf8mb3_collation }} {{ db_utf8mb4_collation }} '{{ db_root_password }}'
+      when: db_import_result.rc != 0
+      register: db_fix_result
+
+    - name: Mark SQL import as completed
+      ansible.builtin.file:
+        path: "{{ vm_lab_root }}/.{{ db_name }}_imported"
+        state: touch
+        owner: "{{ service_user }}"
+        group: "{{ service_user }}"
+        mode: "0644"
+      when: db_import_result.rc == 0 or (db_fix_result is defined and db_fix_result.rc == 0)
+
+    - name: Fail when import and automatic fix both fail
+      ansible.builtin.fail:
+        msg: "MariaDB import failed. Inspect {{ vm_lab_root }}/all.sql and rerun the play."
+      when: db_import_result.rc != 0 and (db_fix_result is not defined or db_fix_result.rc != 0)
+
+- name: Normalize gpcl table names to uppercase for Linux MariaDB
+  ansible.builtin.shell: >
+    python3 {{ scripts_dir }}/normalize_gpcl_table_case.py
+    --db-name {{ db_name | quote }}
+    --db-user {{ db_user | quote }}
+    --db-password {{ db_password | quote }}
+  register: db_table_case_result
+  changed_when: "'RESULT=changed' in db_table_case_result.stdout"
+  when: db_enable_case_compat | bool
+
+- name: Create lowercase compatibility views for legacy scheduler SQL
+  ansible.builtin.shell: |
+    mariadb -h 127.0.0.1 -u root -p'{{ db_root_password }}' {{ db_name }} <<'SQL'
+    DROP VIEW IF EXISTS gpcl_bat_schdl;
+    CREATE VIEW gpcl_bat_schdl AS SELECT * FROM GPCL_BAT_SCHDL;
+
+    DROP VIEW IF EXISTS gpcl_bat_task_grp;
+    CREATE VIEW gpcl_bat_task_grp AS SELECT * FROM GPCL_BAT_TASK_GRP;
+    SQL
+  changed_when: false
+  when: db_enable_case_compat | bool
+
+- name: Create uppercase compatibility view for IWON merchant table
+  ansible.builtin.shell: |
+    mariadb -h 127.0.0.1 -u root -p'{{ db_root_password }}' {{ db_name }} <<'SQL'
+    SET @has_upper := (
+      SELECT COUNT(*)
+      FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'IWON_MCHT'
+    );
+    SET @has_lower := (
+      SELECT COUNT(*)
+      FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'iwon_mcht'
+    );
+
+    SET @stmt := IF(
+      @has_upper = 0 AND @has_lower > 0,
+      'CREATE VIEW IWON_MCHT AS SELECT * FROM iwon_mcht',
+      'SELECT 1'
+    );
+
+    PREPARE s FROM @stmt;
+    EXECUTE s;
+    DEALLOCATE PREPARE s;
+    SQL
+  changed_when: false
+  when: db_enable_case_compat | bool

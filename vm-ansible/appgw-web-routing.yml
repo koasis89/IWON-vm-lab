@@ -1,0 +1,73 @@
+---
+- name: App Gateway 기본 경로를 web01로 전환
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - group_vars/all.yml
+    - group_vars/azure.yml
+  tasks:
+    - name: web backend pool 생성/갱신
+      ansible.builtin.command: >
+        az network application-gateway address-pool create
+        -g {{ az_resource_group }}
+        --gateway-name {{ az_appgw_name }}
+        -n {{ az_web_backend_pool_name }}
+        --servers {{ az_web_backend_ip }}
+      register: web_pool
+      changed_when: web_pool.rc == 0
+
+    - name: web health probe 생성/갱신
+      ansible.builtin.command: >
+        az network application-gateway probe create
+        -g {{ az_resource_group }}
+        --gateway-name {{ az_appgw_name }}
+        -n {{ az_web_probe_name }}
+        --protocol Http
+        --host 127.0.0.1
+        --path /
+        --interval 30
+        --timeout 30
+        --threshold 3
+        --match-status-codes 200-499
+      register: web_probe
+      changed_when: web_probe.rc == 0
+
+    - name: web http settings 생성/갱신
+      ansible.builtin.command: >
+        az network application-gateway http-settings create
+        -g {{ az_resource_group }}
+        --gateway-name {{ az_appgw_name }}
+        -n {{ az_web_http_settings_name }}
+        --port {{ az_web_backend_port }}
+        --protocol Http
+        --timeout 30
+        --cookie-based-affinity Disabled
+        --probe {{ az_web_probe_name }}
+      register: web_settings
+      changed_when: web_settings.rc == 0
+
+    - name: main path map 기본 백엔드를 web01로 전환
+      ansible.builtin.command: >
+        az network application-gateway url-path-map update
+        -g {{ az_resource_group }}
+        --gateway-name {{ az_appgw_name }}
+        -n {{ az_appgw_url_path_map_name }}
+        --default-address-pool {{ az_web_backend_pool_name }}
+        --default-http-settings {{ az_web_http_settings_name }}
+      register: path_map_update
+      changed_when: path_map_update.rc == 0
+
+    - name: App Gateway 백엔드 헬스 확인
+      ansible.builtin.command: >
+        az network application-gateway show-backend-health
+        -g {{ az_resource_group }}
+        -n {{ az_appgw_name }}
+        --query "backendAddressPools[].backendHttpSettingsCollection[].servers[].{address:address,health:health,reason:healthProbeLog}"
+        -o table
+      register: backend_health
+      changed_when: false
+
+    - name: 백엔드 헬스 출력
+      ansible.builtin.debug:
+        var: backend_health.stdout_lines

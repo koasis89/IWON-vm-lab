@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    strimzi.io/discovery: |-
+      [ {
+        "port" : 9092,
+        "tls" : false,
+        "protocol" : "kafka",
+        "auth" : "none"
+      } ]
+  creationTimestamp: "2026-01-26T02:21:06Z"
+  labels:
+    app.kubernetes.io/instance: dev-kafka
+    app.kubernetes.io/managed-by: strimzi-cluster-operator
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/part-of: strimzi-dev-kafka
+    strimzi.io/cluster: dev-kafka
+    strimzi.io/component-type: kafka
+    strimzi.io/discovery: "true"
+    strimzi.io/kind: Kafka
+    strimzi.io/name: dev-kafka-kafka
+  name: dev-kafka-kafka-bootstrap
+  namespace: dev-vm
+  ownerReferences:
+  - apiVersion: kafka.strimzi.io/v1beta2
+    blockOwnerDeletion: true
+    controller: false
+    kind: Kafka
+    name: dev-kafka
+    uid: 3cf5b95b-3b9a-466d-b070-d3f89401c705
+  resourceVersion: "2510403"
+  uid: 10c1f748-5837-4a9e-abcf-32b0c62017d4
+spec:
+  clusterIP: 10.100.91.250
+  clusterIPs:
+  - 10.100.91.250
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: tcp-replication
+    port: 9091
+    protocol: TCP
+    targetPort: tcp-replication
+  - name: tcp-clients
+    port: 9092
+    protocol: TCP
+    targetPort: tcp-clients
+  selector:
+    strimzi.io/broker-role: "true"
+    strimzi.io/cluster: dev-kafka
+    strimzi.io/kind: Kafka
+    strimzi.io/name: dev-kafka-kafka
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}

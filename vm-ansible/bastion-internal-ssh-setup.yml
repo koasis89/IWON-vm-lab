@@ -1,0 +1,53 @@
+---
+- name: Prepare bastion SSH key for internal VM access
+  hosts: bastion
+  gather_facts: false
+  become: false
+  vars:
+    bastion_internal_ssh_key_path: "~/.ssh/id_rsa_internal"
+  tasks:
+    - name: Ensure .ssh directory exists on bastion
+      ansible.builtin.file:
+        path: "~/.ssh"
+        state: directory
+        mode: "0700"
+
+    - name: Generate dedicated SSH keypair on bastion
+      ansible.builtin.openssh_keypair:
+        path: "{{ bastion_internal_ssh_key_path }}"
+        type: rsa
+        size: 4096
+        mode: "0600"
+
+    - name: Read bastion public key
+      ansible.builtin.slurp:
+        src: "{{ bastion_internal_ssh_key_path }}.pub"
+      register: bastion_internal_pubkey_file
+
+    - name: Store bastion public key as host fact
+      ansible.builtin.set_fact:
+        bastion_internal_public_key: "{{ bastion_internal_pubkey_file.content | b64decode | trim }}"
+
+    - name: Ensure SSH client config uses dedicated key for internal VMs
+      ansible.builtin.blockinfile:
+        path: "~/.ssh/config"
+        create: true
+        mode: "0600"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - INTERNAL VM SSH"
+        block: |
+          Host 10.0.2.* web01 was01 app01 smartcontract01 db01 kafka01
+            User {{ ansible_user | default('iwon') }}
+            IdentityFile {{ bastion_internal_ssh_key_path }}
+            IdentitiesOnly yes
+            StrictHostKeyChecking accept-new
+
+- name: Allow bastion key on internal VMs
+  hosts: internal_vms
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Authorize bastion public key for internal VM login
+      ansible.posix.authorized_key:
+        user: "{{ ansible_user }}"
+        key: "{{ hostvars[groups['bastion'][0]].bastion_internal_public_key }}"
+        state: present

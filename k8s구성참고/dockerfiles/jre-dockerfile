@@ -1,0 +1,13 @@
+FROM eclipse-temurin:17-jre-jammy
+
+# 운영 기본값(필요 시 조정)
+ENV TZ=Asia/Seoul
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=75 -XX:+UseG1GC -Dfile.encoding=UTF-8"
+
+WORKDIR /app
+
+# 컨테이너는 보통 8080 기준
+EXPOSE 8080
+
+# 실제 실행은 최종 앱 이미지에서 ENTRYPOINT로 덮어씌우거나 그대로 사용
+CMD ["bash", "-lc", "java -version && sleep 3600"]

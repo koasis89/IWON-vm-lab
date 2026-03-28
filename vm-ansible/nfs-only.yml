@@ -1,0 +1,6 @@
+---
+- name: Mount Azure Files NFS on app VMs
+  hosts: app_vms
+  become: true
+  roles:
+    - nfs_client

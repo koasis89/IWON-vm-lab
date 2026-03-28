@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: k8s-lab-root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/iteyes9797/k8s-lab.git' 
+    targetRevision: setup                               
+    path: 'argoCd'                                     
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

@@ -1,0 +1,49 @@
+server:
+  service:
+    type: NodePort
+    nodePortHttp: 30008
+    nodePortHttps: 30043
+
+configs:
+  params:
+    server.insecure: true
+
+  cm:
+    application.instanceLabelKey: argocd.argoproj.io/instance
+    timeout.reconciliation: 180s
+
+    # GitHub OAuth 연동 시 사용
+    # url: https://argocd.example.com
+
+  rbac:
+    policy.default: role:readonly
+    policy.csv: |
+      p, role:admin, applications, *, */*, allow
+      p, role:admin, clusters, *, *, allow
+      p, role:admin, repositories, *, *, allow
+      p, role:admin, projects, *, *, allow
+      g, admin, role:admin
+
+controller:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+repoServer:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+redis:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 128Mi

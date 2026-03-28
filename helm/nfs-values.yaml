@@ -1,0 +1,21 @@
+nfs:
+  server: 10.0.2.30
+  path: /nfs/data
+
+storageClass:
+  create: true
+  name: nfs-client        
+  defaultClass: true        
+  reclaimPolicy: Delete
+  mountOptions:
+    - vers=4.1
+  archiveOnDelete: false
+
+# RBAC 설정 (권한 문제 방지)
+rbac:
+  create: true
+
+# Image 설정 (간혹 해외 레포지토리 속도 문제 시 확인 필요)
+image:
+  repository: registry.k8s.io/sig-storage/nfs-subdir-external-provisioner
+  tag: v4.0.2

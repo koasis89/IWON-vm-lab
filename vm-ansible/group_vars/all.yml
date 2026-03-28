@@ -1,0 +1,60 @@
+base_packages:
+  - unzip
+  - tar
+  - curl
+
+java_packages:
+  - openjdk-17-jre-headless
+
+vm_lab_root: /opt/vm-lab
+scripts_dir: /opt/scripts
+log_dir: /var/log/iwon
+service_user: iwon
+
+web_html_zip_src: "{{ playbook_dir }}/../backup/dev-web/html.zip"
+nginx_conf_src: "{{ playbook_dir }}/../dockerfiles/nginx.conf"
+
+was_jar_src: "{{ playbook_dir }}/../backup/dev-was/GodisWebServer-0.0.1-SNAPSHOT.jar"
+app_jar_src: "{{ playbook_dir }}/../backup/dev-app/godisappserver-0.0.1-SNAPSHOT.jar"
+integration_jar_src: "{{ playbook_dir }}/../backup/dev-integration/IWonPaymentIntegration-0.0.1-SNAPSHOT.jar"
+
+db_sql_src: "{{ playbook_dir }}/../backup/db/all.sql"
+db_values_yaml_src: "{{ playbook_dir }}/../backup/db/values.yaml"
+db_user_values_src: "{{ playbook_dir }}/../backup/db/USER-SUPPLIED VALUES.txt"
+db_fix_script_src: "{{ playbook_dir }}/../tools(sh-py)/fix-mariadb-collation.sh"
+
+db_name: appdb
+db_user: appuser
+db_password: "<APP_DB_PASSWORD>"
+db_root_password: "<ROOT_DB_PASSWORD>"
+db_utf8mb3_collation: utf8mb3_general_ci
+db_utf8mb4_collation: utf8mb4_general_ci
+db_bind_address: 0.0.0.0
+db_lower_case_table_names: 1
+db_enable_case_compat: false
+db_schema_naming_standard: lowercase
+# DBeaver/bastion 경유 접속을 위해 명시적으로 허용할 추가 호스트 패턴
+db_extra_hosts:
+  - 'bastion01.internal.cloudapp.net'
+  - '10.0.3.%'
+
+kafka_version: 4.1.1
+kafka_scala_version: "2.13"
+kafka_install_root: /opt
+kafka_home: /opt/kafka
+kafka_data_dir: /var/lib/kafka
+kafka_config_dir: /etc/kafka
+kafka_listeners: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+kafka_advertised_listener_host: 10.0.2.60
+kafka_controller_quorum_voters: "1@10.0.2.60:9093"
+
+# Kafka client settings for application VMs (was/integration)
+kafka_client_bootstrap_servers: "10.0.2.60:9092"
+kafka_client_security_protocol: "PLAINTEXT"
+kafka_client_tls_enabled: "false"
+kafka_client_sasl_enabled: "false"
+
+nfs_mount_enabled: true
+nfs_storage_account: "iwonsfskrciwonsvcrg01"
+nfs_share_name: "shared"
+nfs_mount_path: /mnt/shared

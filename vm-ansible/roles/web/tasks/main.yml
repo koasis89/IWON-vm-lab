@@ -1,0 +1,61 @@
+---
+- name: Install nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+    update_cache: true
+
+- name: Create working directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ service_user }}"
+    group: "{{ service_user }}"
+    mode: "0755"
+  loop:
+    - "{{ vm_lab_root }}"
+    - /var/www/html
+
+- name: Upload web archive
+  ansible.builtin.copy:
+    src: "{{ web_html_zip_src }}"
+    dest: "{{ vm_lab_root }}/html.zip"
+    owner: "{{ service_user }}"
+    group: "{{ service_user }}"
+    mode: "0644"
+
+- name: Clean existing web root contents
+  ansible.builtin.shell: rm -rf /var/www/html/*
+  changed_when: false
+
+- name: Extract web archive with unzip
+  ansible.builtin.command: >
+    unzip -oq {{ vm_lab_root }}/html.zip -d /var/www/html
+
+- name: Ensure web root ownership
+  ansible.builtin.file:
+    path: /var/www/html
+    state: directory
+    owner: "{{ service_user }}"
+    group: "{{ service_user }}"
+    mode: "0755"
+    recurse: true
+
+- name: Deploy nginx site configuration
+  ansible.builtin.copy:
+    src: "{{ nginx_conf_src }}"
+    dest: /etc/nginx/sites-available/default
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart nginx
+
+- name: Validate nginx configuration
+  ansible.builtin.command: nginx -t
+  changed_when: false
+
+- name: Ensure nginx service is enabled
+  ansible.builtin.systemd:
+    name: nginx
+    enabled: true
+    state: started

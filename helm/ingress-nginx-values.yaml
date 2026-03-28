@@ -1,0 +1,20 @@
+controller:
+  replicaCount: 1
+
+  nodeSelector:
+    kubernetes.io/os: linux
+
+  service:
+    type: NodePort
+    nodePorts:
+      http: 30080
+      https: 30443
+
+  metrics:
+    enabled: true
+
+  admissionWebhooks:
+    enabled: true
+
+defaultBackend:
+  enabled: true
