@@ -1,0 +1,112 @@
+---
+- name: Install Azure DevOps self-hosted agent
+  hosts: all
+  become: true
+  vars:
+    ado_agent_version: "4.252.0"
+    ado_agent_install_dir: "/opt/ado-agent"
+    ado_agent_user: "iwon"
+    ado_agent_name: "{{ inventory_hostname }}-ado"
+    ado_agent_work_dir: "_work"
+    ado_agent_replace: true
+
+  pre_tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - ado_url is defined
+          - ado_url | length > 0
+          - ado_pool is defined
+          - ado_pool | length > 0
+          - ado_pat is defined
+          - ado_pat | length > 0
+        fail_msg: "Required vars: ado_url, ado_pool, ado_pat"
+
+  tasks:
+    - name: Install required packages
+      ansible.builtin.apt:
+        name:
+          - curl
+          - tar
+          - libicu-dev
+        state: present
+        update_cache: true
+
+    - name: Ensure agent user exists
+      ansible.builtin.user:
+        name: "{{ ado_agent_user }}"
+        shell: /bin/bash
+        create_home: true
+
+    - name: Create agent install directory
+      ansible.builtin.file:
+        path: "{{ ado_agent_install_dir }}"
+        state: directory
+        owner: "{{ ado_agent_user }}"
+        group: "{{ ado_agent_user }}"
+        mode: "0755"
+
+    - name: Check if agent already configured
+      ansible.builtin.stat:
+        path: "{{ ado_agent_install_dir }}/.agent"
+      register: ado_agent_configured
+
+    - name: Download Azure DevOps agent package
+      ansible.builtin.get_url:
+        url: "https://vstsagentpackage.azureedge.net/agent/{{ ado_agent_version }}/vsts-agent-linux-x64-{{ ado_agent_version }}.tar.gz"
+        dest: "/tmp/vsts-agent-linux-x64-{{ ado_agent_version }}.tar.gz"
+        mode: "0644"
+      when: not ado_agent_configured.stat.exists
+
+    - name: Extract agent package
+      ansible.builtin.unarchive:
+        src: "/tmp/vsts-agent-linux-x64-{{ ado_agent_version }}.tar.gz"
+        dest: "{{ ado_agent_install_dir }}"
+        remote_src: true
+        owner: "{{ ado_agent_user }}"
+        group: "{{ ado_agent_user }}"
+      when: not ado_agent_configured.stat.exists
+
+    - name: Configure agent (unattended)
+      ansible.builtin.shell: |
+        ./config.sh --unattended \
+          --url "{{ ado_url }}" \
+          --auth pat \
+          --token "{{ ado_pat }}" \
+          --pool "{{ ado_pool }}" \
+          --agent "{{ ado_agent_name }}" \
+          --work "{{ ado_agent_work_dir }}" \
+          --acceptTeeEula \
+          --replace
+      args:
+        chdir: "{{ ado_agent_install_dir }}"
+      become_user: "{{ ado_agent_user }}"
+      no_log: true
+      when: (not ado_agent_configured.stat.exists) or (ado_agent_replace | bool)
+
+    - name: Check if service marker exists
+      ansible.builtin.stat:
+        path: "{{ ado_agent_install_dir }}/.service"
+      register: ado_agent_service_marker
+
+    - name: Install service
+      ansible.builtin.command:
+        cmd: "./svc.sh install {{ ado_agent_user }}"
+        chdir: "{{ ado_agent_install_dir }}"
+      when: not ado_agent_service_marker.stat.exists
+
+    - name: Start service
+      ansible.builtin.command:
+        cmd: "./svc.sh start"
+        chdir: "{{ ado_agent_install_dir }}"
+
+    - name: Show status
+      ansible.builtin.command:
+        cmd: "./svc.sh status"
+        chdir: "{{ ado_agent_install_dir }}"
+      register: ado_agent_status
+      changed_when: false
+
+    - name: Print status output
+      ansible.builtin.debug:
+        var: ado_agent_status.stdout_lines

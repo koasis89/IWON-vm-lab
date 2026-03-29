@@ -53,6 +53,9 @@ crash.log
 apply.log
 *.log
 tfplan
+deploy.conf
+ops/scripts/deploy.conf
+ops/scripts/artifacts.conf
 helm_bak_20260318/dev-vm-FINAL-TOTAL-BACKUP.yaml
 argoCd/dockerhub-creds.yaml
 
@@ -72,5 +75,6 @@ k8s_configs/kubectl
 deploy-shell-assets.zip
 helm_bak_20260318/*.tgz
 backup/**
-
+vm-azure/docs/*.mp4
 helm_bak_20260318/.claude/worktrees/
+Azure_VM*.*

@@ -1,0 +1,91 @@
+---
+- name: Common setup on internal VMs
+  hosts: internal_vms
+  become: true
+  roles:
+    - common
+
+- name: Optional NFS mount on app VMs
+  hosts: app_vms
+  become: true
+  roles:
+    - nfs_client
+
+- name: Configure web server
+  hosts: web
+  become: true
+  roles:
+    - web
+
+- name: Configure WAS service
+  hosts: was
+  become: true
+  roles:
+    - role: java_service
+      vars:
+        java_service_name: was
+        java_service_description: IWON WAS Service
+        java_app_dir: /opt/apps/was
+        java_jar_local_src: "{{ was_jar_src }}"
+        java_jar_remote_name: app.jar
+        java_log_file: "{{ log_dir }}/was.log"
+        java_xml_gpcl_patch: true
+        java_class_patch_specs:
+          - class_path: BOOT-INF/classes/com/godisweb/config/SecurityConfig.class
+            replacements:
+              - old: http://192.168.0.122:9092
+                new: https://www.iwon-smart.site
+              - old: http://192.168.0.122
+                new: https://iwon-smart.site
+          - class_path: BOOT-INF/classes/com/godisweb/config/websocket/WebSocketConfig.class
+            replacements:
+              - old: http://localhost:3000
+                new: https://www.iwon-smart.site
+              - old: http://127.0.0.1:3000
+                new: https://iwon-smart.site
+        java_env_vars:
+          KAFKA_BOOTSTRAP_SERVERS: "{{ kafka_client_bootstrap_servers }}"
+          KAFKA_SECURITY_PROTOCOL: "{{ kafka_client_security_protocol }}"
+          KAFKA_TLS_ENABLED: "{{ kafka_client_tls_enabled }}"
+          KAFKA_SASL_ENABLED: "{{ kafka_client_sasl_enabled }}"
+          SPRING_KAFKA_BOOTSTRAP_SERVERS: "{{ kafka_client_bootstrap_servers }}"
+          SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL: "{{ kafka_client_security_protocol }}"
+
+- name: Configure app service
+  hosts: app
+  become: true
+  roles:
+    - role: java_service
+      vars:
+        java_service_name: app
+        java_service_description: IWON App Service
+        java_app_dir: /opt/apps/app
+        java_jar_local_src: "{{ app_jar_src }}"
+        java_jar_remote_name: app.jar
+        java_log_file: "{{ log_dir }}/app.log"
+
+- name: Configure integration service
+  hosts: integration
+  become: true
+  roles:
+    - role: java_service
+      vars:
+        java_service_name: integration
+        java_service_description: IWON Integration Service
+        java_app_dir: /opt/apps/integration
+        java_jar_local_src: "{{ integration_jar_src }}"
+        java_jar_remote_name: IWonPaymentIntegration-0.0.1-SNAPSHOT.jar
+        java_log_file: "{{ log_dir }}/integration.log"
+        java_env_vars:
+          KAFKA_BOOTSTRAP_SERVERS: "{{ kafka_client_bootstrap_servers }}"
+          KAFKA_SECURITY_PROTOCOL: "{{ kafka_client_security_protocol }}"
+          KAFKA_TLS_ENABLED: "{{ kafka_client_tls_enabled }}"
+          KAFKA_SASL_ENABLED: "{{ kafka_client_sasl_enabled }}"
+          SPRING_KAFKA_BOOTSTRAP_SERVERS: "{{ kafka_client_bootstrap_servers }}"
+          SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL: "{{ kafka_client_security_protocol }}"
+
+- name: Configure Kafka server
+  hosts: kafka
+  become: true
+  roles:
+    - kafka

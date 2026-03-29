@@ -1,0 +1,8 @@
+# Copy this file to deploy.conf and set real values.
+
+ADO_ORG="ITEYES-ORG"
+ADO_PROJECT="MyProject"
+ADO_PIPELINE_ID="123"
+ADO_PAT="REPLACE_WITH_PAT"
+# Optional (default: refs/heads/main)
+# ADO_BRANCH="refs/heads/main"

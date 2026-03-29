@@ -1,0 +1,13 @@
+# Copy to ops/scripts/artifacts.conf and fill real values.
+# This file is consumed by publish-universal-package.sh.
+# Default values can be centralized in ops/scripts/ops-defaults.env.
+
+ADO_ORG="iteyes-ito"
+ADO_PROJECT="iwon-ops"
+ADO_PAT="REPLACE_WITH_PAT"
+
+ARTIFACT_FEED_NAME="iwon-feed"
+UNIVERSAL_PACKAGE_NAME="iwon-ops-bundle"
+
+# Optional: if omitted, script auto-generates YYYY.MM.DD-<gitsha>
+# UNIVERSAL_PACKAGE_VERSION="2026.3.29-main"

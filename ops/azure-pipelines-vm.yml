@@ -1,0 +1,485 @@
+trigger: none
+
+pr: none
+
+parameters:
+  - name: runTerraform
+    displayName: Run Terraform Apply
+    type: boolean
+    default: false
+
+  - name: deployTarget
+    displayName: Ansible deploy target
+    type: string
+    default: all
+    values:
+      - all
+      - web
+      - was
+      - app
+      - integration
+      - kafka
+
+  - name: artifactFeedType
+    displayName: Feed package type
+    type: string
+    default: from-defaults
+    values:
+      - from-defaults
+      - universal
+      - maven
+
+  - name: artifactFeedName
+    displayName: Artifacts feed name
+    type: string
+    default: ''
+
+  - name: artifactFeedView
+    displayName: Artifacts feed view (maven)
+    type: string
+    default: ''
+
+  - name: universalPackageName
+    displayName: Universal package name
+    type: string
+    default: ''
+
+  - name: universalPackageVersion
+    displayName: Universal package version
+    type: string
+    default: ''
+
+  - name: mavenPackageDefinition
+    displayName: Maven package definition (group:artifact)
+    type: string
+    default: ''
+
+  - name: mavenPackageVersion
+    displayName: Maven package version
+    type: string
+    default: ''
+
+  - name: artifactDownloadDir
+    displayName: Download directory
+    type: string
+    default: ''
+
+  - name: webHtmlZipRelative
+    displayName: WEB html.zip relative path in package
+    type: string
+    default: ''
+
+  - name: wasJarRelative
+    displayName: WAS jar relative path in package
+    type: string
+    default: ''
+
+  - name: appJarRelative
+    displayName: APP jar relative path in package
+    type: string
+    default: ''
+
+  - name: integrationJarRelative
+    displayName: INTEGRATION jar relative path in package
+    type: string
+    default: ''
+
+variables:
+  - name: ENVIRONMENT_NAME_INFRA
+    value: iwon-vm-ops-infra
+  - name: ENVIRONMENT_NAME_APP
+    value: iwon-vm-ops-app
+
+  - name: TF_WORKING_DIR
+    value: vm-azure
+  - name: ANSIBLE_CONFIG_PATH
+    value: vm-ansible/ansible.cfg
+  - name: TF_OUTPUT_JSON
+    value: $(Pipeline.Workspace)/generated/tf-output.json
+  - name: ANSIBLE_INVENTORY_OUT
+    value: $(Pipeline.Workspace)/generated/inventory.generated.ini
+
+  - name: TFVARS_FILE
+    value: vm-azure/environments/prod.tfvars
+  - name: ANSIBLE_SSH_USER
+    value: iwon
+  - name: ANSIBLE_SSH_KEY_PATH
+    value: ~/.ssh/id_rsa
+  - name: APPROVER_EMAILS
+    value: ''
+
+  - name: AZURE_SERVICE_CONNECTION
+    value: ''
+  - name: ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE
+    value: ''
+
+  - name: TFSTATE_RG
+    value: ''
+  - name: TFSTATE_STORAGE
+    value: ''
+  - name: TFSTATE_CONTAINER
+    value: tfstate
+  - name: TFSTATE_KEY
+    value: vm-azure/prod.tfstate
+
+stages:
+  - stage: GateTerraform
+    displayName: Manual Gate - Terraform
+    condition: and(succeeded(), eq('${{ parameters.runTerraform }}', true))
+    jobs:
+      - job: WaitTerraformApproval
+        pool: server
+        steps:
+          - task: ManualValidation@0
+            timeoutInMinutes: 1440
+            inputs:
+              notifyUsers: $(APPROVER_EMAILS)
+              instructions: 'Terraform 진행 승인 후 Resume 하세요.'
+              onTimeout: reject
+
+  - stage: Terraform
+    displayName: Terraform Apply
+    dependsOn: GateTerraform
+    condition: and(succeeded(), eq('${{ parameters.runTerraform }}', true))
+    jobs:
+      - deployment: TerraformApply
+        displayName: Apply Terraform
+        environment: $(ENVIRONMENT_NAME_INFRA)
+        strategy:
+          runOnce:
+            deploy:
+              pool:
+                vmImage: ubuntu-latest
+              steps:
+                - checkout: self
+
+                - task: TerraformInstaller@1
+                  displayName: Install Terraform
+                  inputs:
+                    terraformVersion: latest
+
+                - task: AzureCLI@2
+                  displayName: Terraform init/validate/plan/apply
+                  inputs:
+                    azureSubscription: $(AZURE_SERVICE_CONNECTION)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+
+                      if [ -z "$(TFSTATE_RG)" ] || [ -z "$(TFSTATE_STORAGE)" ]; then
+                        echo "TFSTATE_RG/TFSTATE_STORAGE must be configured for managed agent runs."
+                        exit 1
+                      fi
+
+                      terraform -chdir="$(TF_WORKING_DIR)" init \
+                        -backend-config="resource_group_name=$(TFSTATE_RG)" \
+                        -backend-config="storage_account_name=$(TFSTATE_STORAGE)" \
+                        -backend-config="container_name=$(TFSTATE_CONTAINER)" \
+                        -backend-config="key=$(TFSTATE_KEY)"
+
+                      terraform -chdir="$(TF_WORKING_DIR)" validate
+                      terraform -chdir="$(TF_WORKING_DIR)" plan -var-file="$(TFVARS_FILE)" -out=tfplan
+                      terraform -chdir="$(TF_WORKING_DIR)" apply -auto-approve tfplan
+
+                      RG_NAME=$(terraform -chdir="$(TF_WORKING_DIR)" output -raw resource_group_name)
+                      SUB_ID=$(az account show --query id -o tsv)
+                      echo "Azure Portal: https://portal.azure.com/#@/resource/subscriptions/${SUB_ID}/resourceGroups/${RG_NAME}/overview"
+
+                      mkdir -p "$(Pipeline.Workspace)/generated"
+                      terraform -chdir="$(TF_WORKING_DIR)" output -json > "$(TF_OUTPUT_JSON)"
+
+                - publish: $(TF_OUTPUT_JSON)
+                  artifact: terraform-output
+                  displayName: Publish Terraform outputs
+
+  - stage: GateAnsible
+    displayName: Manual Gate - Ansible
+    dependsOn: Terraform
+    condition: always()
+    jobs:
+      - job: WaitAnsibleApproval
+        pool: server
+        steps:
+          - task: ManualValidation@0
+            timeoutInMinutes: 1440
+            inputs:
+              notifyUsers: $(APPROVER_EMAILS)
+              instructions: '애플리케이션 배포 진행 승인 후 Resume 하세요.'
+              onTimeout: reject
+
+  - stage: AnsibleDeploy
+    displayName: Ansible Deploy
+    dependsOn:
+      - Terraform
+      - GateAnsible
+    condition: and(
+      succeeded('GateAnsible'),
+      or(and(eq('${{ parameters.runTerraform }}', true), succeeded('Terraform')), eq('${{ parameters.runTerraform }}', false))
+      )
+    jobs:
+      - deployment: AnsibleDeploy
+        displayName: Configure VMs (APP)
+        environment: $(ENVIRONMENT_NAME_APP)
+        strategy:
+          runOnce:
+            deploy:
+              pool:
+                vmImage: ubuntu-latest
+              steps:
+                - checkout: self
+
+                - task: TerraformInstaller@1
+                  displayName: Install Terraform
+                  inputs:
+                    terraformVersion: latest
+
+                - task: DownloadPipelineArtifact@2
+                  displayName: Download Terraform outputs artifact
+                  condition: eq('${{ parameters.runTerraform }}', true)
+                  inputs:
+                    artifact: terraform-output
+                    path: $(Pipeline.Workspace)/downloaded-terraform
+
+                - task: AzureCLI@2
+                  displayName: Export Terraform outputs when Terraform stage is skipped
+                  condition: eq('${{ parameters.runTerraform }}', false)
+                  inputs:
+                    azureSubscription: $(AZURE_SERVICE_CONNECTION)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+
+                      if [ -z "$(TFSTATE_RG)" ] || [ -z "$(TFSTATE_STORAGE)" ]; then
+                        echo "TFSTATE_RG/TFSTATE_STORAGE must be configured for managed agent runs."
+                        exit 1
+                      fi
+
+                      terraform -chdir="$(TF_WORKING_DIR)" init \
+                        -backend-config="resource_group_name=$(TFSTATE_RG)" \
+                        -backend-config="storage_account_name=$(TFSTATE_STORAGE)" \
+                        -backend-config="container_name=$(TFSTATE_CONTAINER)" \
+                        -backend-config="key=$(TFSTATE_KEY)"
+                      mkdir -p "$(Pipeline.Workspace)/generated"
+                      terraform -chdir="$(TF_WORKING_DIR)" output -json > "$(TF_OUTPUT_JSON)"
+
+                - bash: |
+                    set -euo pipefail
+                    mkdir -p "$(Pipeline.Workspace)/generated"
+                    if [ -f "$(Pipeline.Workspace)/downloaded-terraform/tf-output.json" ]; then
+                      cp "$(Pipeline.Workspace)/downloaded-terraform/tf-output.json" "$(TF_OUTPUT_JSON)"
+                    fi
+
+                    python3 "$(Build.SourcesDirectory)/ops/scripts/generate_inventory_from_tf.py" \
+                      --tf-output "$(TF_OUTPUT_JSON)" \
+                      --output "$(ANSIBLE_INVENTORY_OUT)" \
+                      --ssh-user "$(ANSIBLE_SSH_USER)" \
+                      --ssh-key-path "$(ANSIBLE_SSH_KEY_PATH)"
+                  displayName: Generate inventory from Terraform outputs
+
+                - publish: $(ANSIBLE_INVENTORY_OUT)
+                  artifact: ansible-inventory
+                  displayName: Publish generated inventory
+
+                - task: InstallSSHKey@0
+                  displayName: Install SSH private key
+                  inputs:
+                    knownHostsEntry: ''
+                    sshPublicKey: ''
+                    sshKeySecureFile: $(ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE)
+
+                - bash: |
+                    set -euo pipefail
+                    sudo apt-get update
+                    sudo apt-get install -y ansible python3-pip
+                  displayName: Install Ansible
+
+                - bash: |
+                    set -euo pipefail
+
+                    DEFAULTS_FILE="$(Build.SourcesDirectory)/ops/scripts/ops-defaults.env"
+                    if [ ! -f "$DEFAULTS_FILE" ]; then
+                      echo "defaults file not found: $DEFAULTS_FILE"
+                      exit 1
+                    fi
+
+                    # shellcheck disable=SC1090
+                    source "$DEFAULTS_FILE"
+
+                    resolve_value() {
+                      local input="$1"
+                      local default="$2"
+                      if [ -n "$input" ] && [ "$input" != "from-defaults" ]; then
+                        printf '%s' "$input"
+                      else
+                        printf '%s' "$default"
+                      fi
+                    }
+
+                    EFFECTIVE_ARTIFACT_FEED_TYPE="$(resolve_value "${PARAM_ARTIFACT_FEED_TYPE}" "${OPS_DEFAULT_ARTIFACT_FEED_TYPE}")"
+                    EFFECTIVE_ARTIFACT_FEED_NAME="$(resolve_value "${PARAM_ARTIFACT_FEED_NAME}" "${OPS_DEFAULT_ARTIFACT_FEED_NAME}")"
+                    EFFECTIVE_ARTIFACT_FEED_VIEW="$(resolve_value "${PARAM_ARTIFACT_FEED_VIEW}" "${OPS_DEFAULT_ARTIFACT_FEED_VIEW}")"
+                    EFFECTIVE_UNIVERSAL_PACKAGE_NAME="$(resolve_value "${PARAM_UNIVERSAL_PACKAGE_NAME}" "${OPS_DEFAULT_UNIVERSAL_PACKAGE_NAME}")"
+                    EFFECTIVE_UNIVERSAL_PACKAGE_VERSION="$(resolve_value "${PARAM_UNIVERSAL_PACKAGE_VERSION}" "${OPS_DEFAULT_UNIVERSAL_PACKAGE_VERSION}")"
+                    EFFECTIVE_MAVEN_PACKAGE_DEFINITION="$(resolve_value "${PARAM_MAVEN_PACKAGE_DEFINITION}" "${OPS_DEFAULT_MAVEN_PACKAGE_DEFINITION}")"
+                    EFFECTIVE_MAVEN_PACKAGE_VERSION="$(resolve_value "${PARAM_MAVEN_PACKAGE_VERSION}" "${OPS_DEFAULT_MAVEN_PACKAGE_VERSION}")"
+                    EFFECTIVE_ARTIFACT_DOWNLOAD_DIR="$(resolve_value "${PARAM_ARTIFACT_DOWNLOAD_DIR}" "${OPS_DEFAULT_ARTIFACT_DOWNLOAD_DIR}")"
+                    EFFECTIVE_WEB_HTML_ZIP_RELATIVE="$(resolve_value "${PARAM_WEB_HTML_ZIP_RELATIVE}" "${OPS_DEFAULT_WEB_HTML_ZIP_RELATIVE}")"
+                    EFFECTIVE_WAS_JAR_RELATIVE="$(resolve_value "${PARAM_WAS_JAR_RELATIVE}" "${OPS_DEFAULT_WAS_JAR_RELATIVE}")"
+                    EFFECTIVE_APP_JAR_RELATIVE="$(resolve_value "${PARAM_APP_JAR_RELATIVE}" "${OPS_DEFAULT_APP_JAR_RELATIVE}")"
+                    EFFECTIVE_INTEGRATION_JAR_RELATIVE="$(resolve_value "${PARAM_INTEGRATION_JAR_RELATIVE}" "${OPS_DEFAULT_INTEGRATION_JAR_RELATIVE}")"
+                    EFFECTIVE_WEB_COMPONENT_DIR="${OPS_DEFAULT_WEB_COMPONENT_DIR}"
+                    EFFECTIVE_WAS_COMPONENT_DIR="${OPS_DEFAULT_WAS_COMPONENT_DIR}"
+                    EFFECTIVE_APP_COMPONENT_DIR="${OPS_DEFAULT_APP_COMPONENT_DIR}"
+                    EFFECTIVE_INTEGRATION_COMPONENT_DIR="${OPS_DEFAULT_INTEGRATION_COMPONENT_DIR}"
+                    EFFECTIVE_WEB_FILE_PATTERN="${OPS_DEFAULT_WEB_FILE_PATTERN}"
+                    EFFECTIVE_WAS_FILE_PATTERN="${OPS_DEFAULT_WAS_FILE_PATTERN}"
+                    EFFECTIVE_APP_FILE_PATTERN="${OPS_DEFAULT_APP_FILE_PATTERN}"
+                    EFFECTIVE_INTEGRATION_FILE_PATTERN="${OPS_DEFAULT_INTEGRATION_FILE_PATTERN}"
+
+                    if [ "$EFFECTIVE_ARTIFACT_FEED_TYPE" != "universal" ] && [ "$EFFECTIVE_ARTIFACT_FEED_TYPE" != "maven" ]; then
+                      echo "invalid artifact feed type: $EFFECTIVE_ARTIFACT_FEED_TYPE"
+                      exit 1
+                    fi
+
+                    if [ "$EFFECTIVE_ARTIFACT_FEED_TYPE" = "universal" ]; then
+                      VERSION_TO_VALIDATE="$EFFECTIVE_UNIVERSAL_PACKAGE_VERSION"
+                    else
+                      VERSION_TO_VALIDATE="$EFFECTIVE_MAVEN_PACKAGE_VERSION"
+                    fi
+
+                    SEMVER_REGEX='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+                    if ! printf '%s' "$VERSION_TO_VALIDATE" | grep -Eq "$SEMVER_REGEX"; then
+                      echo "invalid semver: $VERSION_TO_VALIDATE"
+                      exit 1
+                    fi
+
+                    if [[ "$EFFECTIVE_ARTIFACT_DOWNLOAD_DIR" = /* ]]; then
+                      EFFECTIVE_DOWNLOAD_DIR_ABS="$EFFECTIVE_ARTIFACT_DOWNLOAD_DIR"
+                    else
+                      EFFECTIVE_DOWNLOAD_DIR_ABS="$(Pipeline.Workspace)/$EFFECTIVE_ARTIFACT_DOWNLOAD_DIR"
+                    fi
+
+                    echo "##vso[task.setvariable variable=EFFECTIVE_ARTIFACT_FEED_TYPE]$EFFECTIVE_ARTIFACT_FEED_TYPE"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_ARTIFACT_FEED_NAME]$EFFECTIVE_ARTIFACT_FEED_NAME"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_ARTIFACT_FEED_VIEW]$EFFECTIVE_ARTIFACT_FEED_VIEW"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_UNIVERSAL_PACKAGE_NAME]$EFFECTIVE_UNIVERSAL_PACKAGE_NAME"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_UNIVERSAL_PACKAGE_VERSION]$EFFECTIVE_UNIVERSAL_PACKAGE_VERSION"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_MAVEN_PACKAGE_DEFINITION]$EFFECTIVE_MAVEN_PACKAGE_DEFINITION"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_MAVEN_PACKAGE_VERSION]$EFFECTIVE_MAVEN_PACKAGE_VERSION"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_ARTIFACT_DOWNLOAD_DIR]$EFFECTIVE_DOWNLOAD_DIR_ABS"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_WEB_HTML_ZIP_RELATIVE]$EFFECTIVE_WEB_HTML_ZIP_RELATIVE"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_WAS_JAR_RELATIVE]$EFFECTIVE_WAS_JAR_RELATIVE"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_APP_JAR_RELATIVE]$EFFECTIVE_APP_JAR_RELATIVE"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_INTEGRATION_JAR_RELATIVE]$EFFECTIVE_INTEGRATION_JAR_RELATIVE"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_WEB_COMPONENT_DIR]$EFFECTIVE_WEB_COMPONENT_DIR"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_WAS_COMPONENT_DIR]$EFFECTIVE_WAS_COMPONENT_DIR"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_APP_COMPONENT_DIR]$EFFECTIVE_APP_COMPONENT_DIR"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_INTEGRATION_COMPONENT_DIR]$EFFECTIVE_INTEGRATION_COMPONENT_DIR"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_WEB_FILE_PATTERN]$EFFECTIVE_WEB_FILE_PATTERN"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_WAS_FILE_PATTERN]$EFFECTIVE_WAS_FILE_PATTERN"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_APP_FILE_PATTERN]$EFFECTIVE_APP_FILE_PATTERN"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_INTEGRATION_FILE_PATTERN]$EFFECTIVE_INTEGRATION_FILE_PATTERN"
+                  displayName: Resolve defaults and validate semver
+                  env:
+                    PARAM_ARTIFACT_FEED_TYPE: ${{ parameters.artifactFeedType }}
+                    PARAM_ARTIFACT_FEED_NAME: ${{ parameters.artifactFeedName }}
+                    PARAM_ARTIFACT_FEED_VIEW: ${{ parameters.artifactFeedView }}
+                    PARAM_UNIVERSAL_PACKAGE_NAME: ${{ parameters.universalPackageName }}
+                    PARAM_UNIVERSAL_PACKAGE_VERSION: ${{ parameters.universalPackageVersion }}
+                    PARAM_MAVEN_PACKAGE_DEFINITION: ${{ parameters.mavenPackageDefinition }}
+                    PARAM_MAVEN_PACKAGE_VERSION: ${{ parameters.mavenPackageVersion }}
+                    PARAM_ARTIFACT_DOWNLOAD_DIR: ${{ parameters.artifactDownloadDir }}
+                    PARAM_WEB_HTML_ZIP_RELATIVE: ${{ parameters.webHtmlZipRelative }}
+                    PARAM_WAS_JAR_RELATIVE: ${{ parameters.wasJarRelative }}
+                    PARAM_APP_JAR_RELATIVE: ${{ parameters.appJarRelative }}
+                    PARAM_INTEGRATION_JAR_RELATIVE: ${{ parameters.integrationJarRelative }}
+
+                - task: UniversalPackages@0
+                  displayName: Download artifacts from Universal Packages feed
+                  condition: eq(variables['EFFECTIVE_ARTIFACT_FEED_TYPE'], 'universal')
+                  inputs:
+                    command: download
+                    vstsFeed: $(EFFECTIVE_ARTIFACT_FEED_NAME)
+                    vstsFeedPackage: $(EFFECTIVE_UNIVERSAL_PACKAGE_NAME)
+                    vstsPackageVersion: $(EFFECTIVE_UNIVERSAL_PACKAGE_VERSION)
+                    downloadDirectory: $(EFFECTIVE_ARTIFACT_DOWNLOAD_DIR)
+
+                - task: DownloadPackage@1
+                  displayName: Download artifacts from Maven feed
+                  condition: eq(variables['EFFECTIVE_ARTIFACT_FEED_TYPE'], 'maven')
+                  inputs:
+                    packageType: maven
+                    feed: $(EFFECTIVE_ARTIFACT_FEED_NAME)
+                    view: $(EFFECTIVE_ARTIFACT_FEED_VIEW)
+                    definition: $(EFFECTIVE_MAVEN_PACKAGE_DEFINITION)
+                    version: $(EFFECTIVE_MAVEN_PACKAGE_VERSION)
+                    downloadPath: $(EFFECTIVE_ARTIFACT_DOWNLOAD_DIR)
+
+                - bash: |
+                    set -euo pipefail
+
+                    ART_ROOT="$(EFFECTIVE_ARTIFACT_DOWNLOAD_DIR)"
+
+                    resolve_artifact() {
+                      local rel="$1"
+                      local compDir="$2"
+                      local pattern="$3"
+
+                      if [ -n "$rel" ]; then
+                        printf '%s' "${ART_ROOT}/${rel}"
+                        return
+                      fi
+
+                      local baseDir="${ART_ROOT}/${compDir}"
+                      if [ ! -d "$baseDir" ]; then
+                        echo "artifact component dir not found: $baseDir" >&2
+                        exit 1
+                      fi
+
+                      local found
+                      found="$(find "$baseDir" -maxdepth 2 -type f -name "$pattern" | sort | head -n1)"
+                      if [ -z "$found" ]; then
+                        echo "artifact not found by pattern. dir=$baseDir pattern=$pattern" >&2
+                        exit 1
+                      fi
+                      printf '%s' "$found"
+                    }
+
+                    WEB_ZIP="$(resolve_artifact "$(EFFECTIVE_WEB_HTML_ZIP_RELATIVE)" "$(EFFECTIVE_WEB_COMPONENT_DIR)" "$(EFFECTIVE_WEB_FILE_PATTERN)")"
+                    WAS_JAR="$(resolve_artifact "$(EFFECTIVE_WAS_JAR_RELATIVE)" "$(EFFECTIVE_WAS_COMPONENT_DIR)" "$(EFFECTIVE_WAS_FILE_PATTERN)")"
+                    APP_JAR="$(resolve_artifact "$(EFFECTIVE_APP_JAR_RELATIVE)" "$(EFFECTIVE_APP_COMPONENT_DIR)" "$(EFFECTIVE_APP_FILE_PATTERN)")"
+                    INTEGRATION_JAR="$(resolve_artifact "$(EFFECTIVE_INTEGRATION_JAR_RELATIVE)" "$(EFFECTIVE_INTEGRATION_COMPONENT_DIR)" "$(EFFECTIVE_INTEGRATION_FILE_PATTERN)")"
+
+                    for f in "$WEB_ZIP" "$WAS_JAR" "$APP_JAR" "$INTEGRATION_JAR"; do
+                      if [ ! -f "$f" ]; then
+                        echo "artifact not found: $f"
+                        exit 1
+                      fi
+                    done
+
+                    echo "##vso[task.setvariable variable=ART_WEB_ZIP]$WEB_ZIP"
+                    echo "##vso[task.setvariable variable=ART_WAS_JAR]$WAS_JAR"
+                    echo "##vso[task.setvariable variable=ART_APP_JAR]$APP_JAR"
+                    echo "##vso[task.setvariable variable=ART_INTEGRATION_JAR]$INTEGRATION_JAR"
+                  displayName: Validate downloaded artifacts
+
+                - bash: |
+                    set -euo pipefail
+                    export ANSIBLE_HOST_KEY_CHECKING=False
+                    export ANSIBLE_CONFIG="$(Build.SourcesDirectory)/$(ANSIBLE_CONFIG_PATH)"
+
+                    EXTRA_VARS=(
+                      "was_jar_src=$(ART_WAS_JAR)"
+                      "app_jar_src=$(ART_APP_JAR)"
+                      "integration_jar_src=$(ART_INTEGRATION_JAR)"
+                      "web_html_zip_src=$(ART_WEB_ZIP)"
+                    )
+
+                    if [ "${{ parameters.deployTarget }}" = "all" ]; then
+                      ansible-playbook -i "$(ANSIBLE_INVENTORY_OUT)" "$(Build.SourcesDirectory)/ops/ansible/site-app.yml" --extra-vars "${EXTRA_VARS[*]}"
+                    else
+                      ansible-playbook -i "$(ANSIBLE_INVENTORY_OUT)" "$(Build.SourcesDirectory)/ops/ansible/site-app.yml" --limit "${{ parameters.deployTarget }}" --extra-vars "${EXTRA_VARS[*]}"
+                    fi
+                  displayName: Run Ansible application playbook

@@ -1,0 +1,21 @@
+# Azure DevOps Variable Group Template - PROD
+# Create a variable group in Azure DevOps and copy these keys.
+# Mark sensitive keys as secret.
+
+AZURE_SERVICE_CONNECTION: "<service-connection-name>"
+ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE: "<secure-file-name>"
+APPROVER_EMAILS: "prod-approvers@company.com"
+
+DB_APP_PASSWORD: "<secret>"
+DB_ROOT_PASSWORD: "<secret>"
+
+TFSTATE_RG: "<tfstate-resource-group>"
+TFSTATE_STORAGE: "<tfstate-storage-account>"
+TFSTATE_CONTAINER: "tfstate"
+TFSTATE_KEY: "vm-azure/prod.tfstate"
+
+PROD_ALLOWED_TAG_REGEX: "^((main-v[0-9]+\\.[0-9]+\\.[0-9]+)|(release-main-[0-9]+\\.[0-9]+\\.[0-9]+))$"
+
+DB_ROLLBACK_NOTIFY_ENABLED: "true"
+DB_ROLLBACK_NOTIFY_WEBHOOK_URL: "<secret-webhook-url>"
+DB_ROLLBACK_NOTIFY_CHANNEL: "teams"

@@ -12,5 +12,3 @@ terraform output vm_private_ips
   "was01" = "10.0.2.20"
   "web01" = "10.0.2.10"
 }
-
-Test-NetConnection 20.214.224.224 -Port 22 | Format-List *
