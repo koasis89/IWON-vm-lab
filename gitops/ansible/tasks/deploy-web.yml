@@ -1,0 +1,6 @@
+- name: Deploy web artifact with web role
+  ansible.builtin.include_role:
+    name: web
+  vars:
+    web_html_zip_src: "{{ target_artifact }}"
+    nginx_conf_src: "{{ repo_root }}/backup/dev-web/nginx.conf"

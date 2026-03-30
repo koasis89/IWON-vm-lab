@@ -1,0 +1,17 @@
+base_packages:
+  - unzip
+  - tar
+  - curl
+
+java_packages:
+  - openjdk-17-jre-headless
+
+vm_lab_root: /opt/vm-lab
+scripts_dir: /opt/scripts
+log_dir: /var/log/iwon
+service_user: iwon
+
+kafka_client_bootstrap_servers: "10.0.2.60:9092"
+kafka_client_security_protocol: "PLAINTEXT"
+kafka_client_tls_enabled: "false"
+kafka_client_sasl_enabled: "false"

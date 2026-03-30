@@ -1,0 +1,10 @@
+- name: Deploy APP artifact with java_service role
+  ansible.builtin.include_role:
+    name: java_service
+  vars:
+    java_service_name: app
+    java_service_description: IWON App Service
+    java_app_dir: /opt/apps/app
+    java_jar_local_src: "{{ target_artifact }}"
+    java_jar_remote_name: app.jar
+    java_log_file: "{{ log_dir }}/app.log"

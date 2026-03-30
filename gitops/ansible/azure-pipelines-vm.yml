@@ -1,0 +1,278 @@
+trigger: none
+
+pr: none
+
+parameters:
+  - name: runTerraform
+    displayName: Run Terraform Apply
+    type: boolean
+    default: false
+
+  - name: deployTarget
+    displayName: Ansible deploy target
+    type: string
+    default: was
+    values:
+      - web
+      - was
+      - app
+      - integration
+
+  - name: artifactFeedName
+    displayName: Artifacts feed name
+    type: string
+    default: iwon-smart-feed
+
+  - name: artifactFeedView
+    displayName: Artifacts feed view (maven)
+    type: string
+    default: ""
+
+  - name: mavenPackageDefinition
+    displayName: Maven package definition (group:artifact)
+    type: string
+    default: ""
+
+  - name: mavenPackageVersion
+    displayName: Maven package version
+    type: string
+    default: latest
+
+  - name: artifactPattern
+    displayName: Downloaded artifact filename pattern
+    type: string
+    default: ""
+
+variables:
+  - group: iwon-smart-ops-vg
+
+  - name: ENVIRONMENT_NAME_INFRA
+    value: iwon-gitops-infra
+  - name: ENVIRONMENT_NAME_APP
+    value: iwon-gitops-app
+
+  - name: TF_WORKING_DIR
+    value: vm-azure
+  - name: TFVARS_FILE
+    value: vm-azure/environments/prod.tfvars
+  - name: TF_OUTPUT_JSON
+    value: $(Pipeline.Workspace)/generated/tf-output.json
+  - name: ANSIBLE_INVENTORY_OUT
+    value: $(Pipeline.Workspace)/generated/inventory.generated.ini
+
+  - name: ANSIBLE_PLAYBOOK_PATH
+    value: gitops/ansible/deploy-playbook.yml
+  - name: ANSIBLE_CONFIG_PATH
+    value: gitops/ansible/ansible.cfg
+  - name: ANSIBLE_SSH_USER
+    value: iwon
+  - name: ANSIBLE_SSH_KEY_PATH
+    value: ~/.ssh/id_rsa
+
+  - name: AZURE_SERVICE_CONNECTION
+    value: ""
+  - name: ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE
+    value: ""
+
+  - name: TFSTATE_RG
+    value: ""
+  - name: TFSTATE_STORAGE
+    value: ""
+  - name: TFSTATE_CONTAINER
+    value: tfstate
+  - name: TFSTATE_KEY
+    value: vm-azure/prod.tfstate
+
+stages:
+  - stage: Terraform
+    displayName: Terraform Apply
+    condition: and(succeeded(), eq('${{ parameters.runTerraform }}', true))
+    jobs:
+      - deployment: TerraformApply
+        displayName: Apply Terraform
+        environment: $(ENVIRONMENT_NAME_INFRA)
+        strategy:
+          runOnce:
+            deploy:
+              pool:
+                vmImage: ubuntu-latest
+              steps:
+                - checkout: self
+
+                - task: TerraformInstaller@1
+                  displayName: Install Terraform
+                  inputs:
+                    terraformVersion: latest
+
+                - task: AzureCLI@2
+                  displayName: Terraform init/validate/plan/apply
+                  inputs:
+                    azureSubscription: $(AZURE_SERVICE_CONNECTION)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+
+                      if [ -z "$(TFSTATE_RG)" ] || [ -z "$(TFSTATE_STORAGE)" ]; then
+                        echo "TFSTATE_RG/TFSTATE_STORAGE must be configured for managed agent runs."
+                        exit 1
+                      fi
+
+                      terraform -chdir="$(TF_WORKING_DIR)" init \
+                        -backend-config="resource_group_name=$(TFSTATE_RG)" \
+                        -backend-config="storage_account_name=$(TFSTATE_STORAGE)" \
+                        -backend-config="container_name=$(TFSTATE_CONTAINER)" \
+                        -backend-config="key=$(TFSTATE_KEY)"
+
+                      terraform -chdir="$(TF_WORKING_DIR)" validate
+                      terraform -chdir="$(TF_WORKING_DIR)" plan -var-file="$(TFVARS_FILE)" -out=tfplan
+                      terraform -chdir="$(TF_WORKING_DIR)" apply -auto-approve tfplan
+
+                      mkdir -p "$(Pipeline.Workspace)/generated"
+                      terraform -chdir="$(TF_WORKING_DIR)" output -json > "$(TF_OUTPUT_JSON)"
+
+                - publish: $(TF_OUTPUT_JSON)
+                  artifact: terraform-output
+                  displayName: Publish Terraform outputs
+
+  - stage: Deploy
+    displayName: Artifact Download and VM Deploy
+    dependsOn: Terraform
+    condition: or(and(eq('${{ parameters.runTerraform }}', true), succeeded('Terraform')), eq('${{ parameters.runTerraform }}', false))
+    jobs:
+      - deployment: DeployByAnsible
+        displayName: Deploy target service
+        environment: $(ENVIRONMENT_NAME_APP)
+        strategy:
+          runOnce:
+            deploy:
+              pool:
+                vmImage: ubuntu-latest
+              steps:
+                - checkout: self
+
+                - task: TerraformInstaller@1
+                  displayName: Install Terraform
+                  inputs:
+                    terraformVersion: latest
+
+                - task: DownloadPipelineArtifact@2
+                  displayName: Download Terraform outputs artifact
+                  condition: eq('${{ parameters.runTerraform }}', true)
+                  inputs:
+                    artifact: terraform-output
+                    path: $(Pipeline.Workspace)/downloaded-terraform
+
+                - task: AzureCLI@2
+                  displayName: Export Terraform outputs when Terraform stage is skipped
+                  condition: eq('${{ parameters.runTerraform }}', false)
+                  inputs:
+                    azureSubscription: $(AZURE_SERVICE_CONNECTION)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+
+                      if [ -z "$(TFSTATE_RG)" ] || [ -z "$(TFSTATE_STORAGE)" ]; then
+                        echo "TFSTATE_RG/TFSTATE_STORAGE must be configured for managed agent runs."
+                        exit 1
+                      fi
+
+                      terraform -chdir="$(TF_WORKING_DIR)" init \
+                        -backend-config="resource_group_name=$(TFSTATE_RG)" \
+                        -backend-config="storage_account_name=$(TFSTATE_STORAGE)" \
+                        -backend-config="container_name=$(TFSTATE_CONTAINER)" \
+                        -backend-config="key=$(TFSTATE_KEY)"
+
+                      mkdir -p "$(Pipeline.Workspace)/generated"
+                      terraform -chdir="$(TF_WORKING_DIR)" output -json > "$(TF_OUTPUT_JSON)"
+
+                - bash: |
+                    set -euo pipefail
+                    mkdir -p "$(Pipeline.Workspace)/generated"
+                    if [ -f "$(Pipeline.Workspace)/downloaded-terraform/tf-output.json" ]; then
+                      cp "$(Pipeline.Workspace)/downloaded-terraform/tf-output.json" "$(TF_OUTPUT_JSON)"
+                    fi
+
+                    python3 "$(Build.SourcesDirectory)/gitops/scripts/generate_inventory_from_tf.py" \
+                      --tf-output "$(TF_OUTPUT_JSON)" \
+                      --output "$(ANSIBLE_INVENTORY_OUT)" \
+                      --ssh-user "$(ANSIBLE_SSH_USER)" \
+                      --ssh-key-path "$(ANSIBLE_SSH_KEY_PATH)"
+                  displayName: Generate inventory from Terraform outputs
+
+                - task: InstallSSHKey@0
+                  displayName: Install SSH private key
+                  inputs:
+                    knownHostsEntry: ""
+                    sshPublicKey: ""
+                    sshKeySecureFile: $(ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE)
+
+                - bash: |
+                    set -euo pipefail
+                    sudo apt-get update
+                    sudo apt-get install -y ansible python3-pip
+                  displayName: Install Ansible
+
+                - bash: |
+                    set -euo pipefail
+
+                    if [ -n "${PARAM_MAVEN_DEF}" ]; then
+                      EFFECTIVE_MAVEN_DEF="${PARAM_MAVEN_DEF}"
+                    else
+                      EFFECTIVE_MAVEN_DEF="com.iteyes.smart:smart-${PARAM_DEPLOY_TARGET}"
+                    fi
+
+                    if [ -n "${PARAM_ARTIFACT_PATTERN}" ]; then
+                      EFFECTIVE_ARTIFACT_PATTERN="${PARAM_ARTIFACT_PATTERN}"
+                    elif [ "${PARAM_DEPLOY_TARGET}" = "web" ]; then
+                      EFFECTIVE_ARTIFACT_PATTERN="*.zip"
+                    else
+                      EFFECTIVE_ARTIFACT_PATTERN="*.jar"
+                    fi
+
+                    echo "##vso[task.setvariable variable=EFFECTIVE_MAVEN_DEF]$EFFECTIVE_MAVEN_DEF"
+                    echo "##vso[task.setvariable variable=EFFECTIVE_ARTIFACT_PATTERN]$EFFECTIVE_ARTIFACT_PATTERN"
+                  displayName: Resolve package definition and artifact pattern
+                  env:
+                    PARAM_MAVEN_DEF: ${{ parameters.mavenPackageDefinition }}
+                    PARAM_DEPLOY_TARGET: ${{ parameters.deployTarget }}
+                    PARAM_ARTIFACT_PATTERN: ${{ parameters.artifactPattern }}
+
+                - task: DownloadPackage@1
+                  displayName: Download artifact from Maven feed
+                  inputs:
+                    packageType: maven
+                    feed: ${{ parameters.artifactFeedName }}
+                    view: ${{ parameters.artifactFeedView }}
+                    definition: $(EFFECTIVE_MAVEN_DEF)
+                    version: ${{ parameters.mavenPackageVersion }}
+                    downloadPath: $(System.ArtifactsDirectory)
+
+                - bash: |
+                    set -euo pipefail
+
+                    TARGET_ARTIFACT="$(find "$(System.ArtifactsDirectory)" -type f -name "${PATTERN}" | sort | head -n 1)"
+                    if [ -z "${TARGET_ARTIFACT}" ]; then
+                      echo "artifact not found. pattern=${PATTERN}"
+                      echo "download root=$(System.ArtifactsDirectory)"
+                      exit 1
+                    fi
+
+                    echo "Target artifact: ${TARGET_ARTIFACT}"
+                    echo "##vso[task.setvariable variable=TARGET_ARTIFACT]${TARGET_ARTIFACT}"
+                  displayName: Validate downloaded artifact
+                  env:
+                    PATTERN: $(EFFECTIVE_ARTIFACT_PATTERN)
+
+                - bash: |
+                    set -euo pipefail
+                    export ANSIBLE_HOST_KEY_CHECKING=False
+                    export ANSIBLE_CONFIG="$(Build.SourcesDirectory)/$(ANSIBLE_CONFIG_PATH)"
+
+                    ansible-playbook \
+                      -i "$(ANSIBLE_INVENTORY_OUT)" \
+                      "$(Build.SourcesDirectory)/$(ANSIBLE_PLAYBOOK_PATH)" \
+                      --limit "${{ parameters.deployTarget }}" \
+                      --extra-vars "deployTarget=${{ parameters.deployTarget }} target_artifact=$(TARGET_ARTIFACT)"
+                  displayName: Run Ansible deploy playbook

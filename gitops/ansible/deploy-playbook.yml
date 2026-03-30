@@ -1,0 +1,24 @@
+---
+- name: GitOps wrapper deploy playbook
+  hosts: "{{ deployTarget }}"
+  become: true
+  vars:
+    repo_root: "{{ playbook_dir }}/../.."
+
+  pre_tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - deployTarget is defined
+          - deployTarget in ['web', 'was', 'app', 'integration']
+          - target_artifact is defined
+          - target_artifact | length > 0
+        fail_msg: "deployTarget(web/was/app/integration) and target_artifact are required"
+
+  tasks:
+    - name: Apply common role
+      ansible.builtin.include_role:
+        name: common
+
+    - name: Include deploy target tasks
+      ansible.builtin.include_tasks: "tasks/deploy-{{ deployTarget }}.yml"

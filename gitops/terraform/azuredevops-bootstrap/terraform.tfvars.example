@@ -1,0 +1,33 @@
+ado_org                = "iteyes-ito"
+ado_project            = "iwon-smart-ops"
+artifact_feed_name     = "iwon-smart-feed"
+universal_package_name = "iwon-smart-ops-bundle"
+
+# Existing project lookup mode (recommended for current environment)
+create_project = false
+
+# If you need project creation, set create_project=true and adjust description
+# project_description = "Managed by Terraform"
+
+# Optional resources are disabled by default.
+# Manage these manually in Azure DevOps portal unless you explicitly enable below.
+
+# create_variable_group = true
+# variable_group_name   = "iwon-smart-ops-vg"
+# vm_user_name          = ""
+# azure_client_id       = ""
+# azure_client_secret   = ""
+# azure_tenant_id       = ""
+# azure_subscription_id = ""
+
+# create_environments = true
+# environment_names = {
+#   dev   = "dev"
+#   stage = "stage"
+#   prod  = "prod"
+# }
+
+# create_prod_approval_check          = true
+# prod_approval_approver_ids          = ["<approver-origin-id>"]
+# prod_approval_requester_can_approve = false
+# prod_approval_timeout_minutes       = 43200
