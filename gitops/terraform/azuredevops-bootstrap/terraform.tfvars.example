@@ -31,3 +31,28 @@ create_project = false
 # prod_approval_approver_ids          = ["<approver-origin-id>"]
 # prod_approval_requester_can_approve = false
 # prod_approval_timeout_minutes       = 43200
+
+# ---------------------------------------------------------------------------
+# Service Connection (Azure RM)
+# ---------------------------------------------------------------------------
+# azure_client_id, azure_client_secret, azure_tenant_id, azure_subscription_id 는
+# create_variable_group=true 또는 create_service_connection=true 시 필요
+
+# create_service_connection  = true
+# service_connection_name    = "iwon-smart-ops-sc"
+# azure_subscription_name    = "MySubscription"   # 구독 표시 이름 (포털 확인)
+
+# ---------------------------------------------------------------------------
+# Pipeline 등록
+# 등록 후 output pipeline_id 값을 GitHub Secrets.PIPELINE_ID 에 설정
+# ---------------------------------------------------------------------------
+# create_pipeline    = true
+# pipeline_name      = "iwon-vm-cd"
+# gitops_repo_type   = "GitHub"                          # GitHub | TfsGit
+# gitops_repo_id     = "koasis89/IWON-vm-lab"            # GitHub: owner/repo
+# gitops_branch      = "main"
+# pipeline_yaml_path = "gitops/ansible/azure-pipelines-vm.yml"
+
+# GitHub 서비스 커넥션 (gitops_repo_type=GitHub 일 때만 사용)
+# github_service_connection_name = "iwon-github-sc"
+# github_pat                     = "<github-pat-읽기권한>"

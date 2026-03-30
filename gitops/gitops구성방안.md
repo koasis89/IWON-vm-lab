@@ -217,7 +217,8 @@ jobs:
 
 - `ADO_ORG`: `iteyes-ito`
 - `ADO_PROJECT`: `iwon-smart-ops`
-- `ADO_PIPELINE_ID`: Azure DevOps 배포 파이프라인 ID
+- `ADO_PIPELINE_ID`: Azure DevOps 배포 파이프라인 ID  
+  → `gitops/terraform/azuredevops-bootstrap`의 `create_pipeline = true` 적용 후 `terraform output pipeline_id` 로 확인
 - `ADO_PAT`: Azure DevOps REST 호출 가능 PAT
 
 PoC에서는 `ADO_PAT` 하나로 Feed publish 와 Pipeline run 호출을 같이 처리할 수 있습니다. 운영 전환 시에는 publish 용 PAT 와 run 호출용 PAT 를 분리하는 것이 안전합니다.
@@ -637,6 +638,18 @@ stages:
 - 권장: latest 대신 고정 버전으로 재배포해 복구 재현성을 보장
 
 ### 5.3 추가 체크리스트
+
+**ADO 리소스 부트스트랩 (최초 1회)**
+
+| 항목 | 방법 | 비고 |
+|---|---|---|
+| Organization | ADO 콘솔 수동 생성 | Terraform 생성 불가 |
+| Project / Feed | `terraform apply` | `create_project=false` 기본 |
+| Service Connection (Azure RM) | `create_service_connection=true` 후 `terraform apply` | SP 인증 정보 필요 |
+| Pipeline 등록 | `create_pipeline=true` 후 `terraform apply` | GitHub PAT 필요 |
+| `ADO_PIPELINE_ID` 등록 | `terraform output pipeline_id` → GitHub Secrets 저장 | 최초 1회 |
+
+**배포 실행 시**
 
 - 파이프라인 실행 전: deployTarget, 배포 버전, 실행 주체 확인
 - 다운로드 후: 아티팩트 경로 검증(find, web=zip/나머지=jar) 및 누락 시 즉시 실패 처리

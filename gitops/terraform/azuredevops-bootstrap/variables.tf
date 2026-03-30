@@ -120,3 +120,76 @@ variable "prod_approval_timeout_minutes" {
   type        = number
   default     = 43200
 }
+
+# ---------------------------------------------------------------------------
+# Service Connection: Azure RM
+# ---------------------------------------------------------------------------
+variable "create_service_connection" {
+  description = "If true, create Azure RM service connection using service principal credentials."
+  type        = bool
+  default     = false
+}
+
+variable "service_connection_name" {
+  description = "Display name of the Azure RM service connection."
+  type        = string
+  default     = "iwon-smart-ops-sc"
+}
+
+variable "azure_subscription_name" {
+  description = "Azure subscription display name (required for service connection)."
+  type        = string
+  default     = ""
+}
+
+# ---------------------------------------------------------------------------
+# Pipeline Registration
+# ---------------------------------------------------------------------------
+variable "create_pipeline" {
+  description = "If true, register the CD pipeline in Azure DevOps."
+  type        = bool
+  default     = false
+}
+
+variable "pipeline_name" {
+  description = "Display name of the CD pipeline in Azure DevOps."
+  type        = string
+  default     = "iwon-vm-cd"
+}
+
+variable "gitops_repo_type" {
+  description = "Source repo type for pipeline YAML: GitHub or TfsGit."
+  type        = string
+  default     = "GitHub"
+}
+
+variable "gitops_repo_id" {
+  description = "'owner/repo' for GitHub, or repo UUID for TfsGit."
+  type        = string
+  default     = "koasis89/IWON-vm-lab"
+}
+
+variable "gitops_branch" {
+  description = "Branch name where the pipeline YAML file lives."
+  type        = string
+  default     = "main"
+}
+
+variable "pipeline_yaml_path" {
+  description = "Relative path to the pipeline YAML file in the repo."
+  type        = string
+  default     = "gitops/ansible/azure-pipelines-vm.yml"
+}
+
+variable "github_service_connection_name" {
+  description = "Display name of the GitHub service connection (used when gitops_repo_type=GitHub)."
+  type        = string
+  default     = "iwon-github-sc"
+}
+
+variable "github_pat" {
+  description = "GitHub Personal Access Token for reading pipeline YAML (used when gitops_repo_type=GitHub)."
+  type        = string
+  sensitive   = true
+  default     = ""
+}

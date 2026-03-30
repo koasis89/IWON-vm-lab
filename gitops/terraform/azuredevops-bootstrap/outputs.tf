@@ -44,3 +44,23 @@ output "prod_approval_check_id" {
   description = "Prod approval check ID when enabled."
   value       = length(azuredevops_check_approval.prod) > 0 ? azuredevops_check_approval.prod[0].id : null
 }
+
+output "service_connection_id" {
+  description = "Azure RM service connection ID when enabled."
+  value       = length(azuredevops_serviceendpoint_azurerm.this) > 0 ? azuredevops_serviceendpoint_azurerm.this[0].id : null
+}
+
+output "service_connection_name" {
+  description = "Azure RM service connection name when enabled."
+  value       = length(azuredevops_serviceendpoint_azurerm.this) > 0 ? azuredevops_serviceendpoint_azurerm.this[0].service_endpoint_name : null
+}
+
+output "pipeline_id" {
+  description = "CD pipeline ID when enabled. GitHub Actions REST API 호출 시 PIPELINE_ID로 사용."
+  value       = length(azuredevops_build_definition.cd) > 0 ? azuredevops_build_definition.cd[0].id : null
+}
+
+output "pipeline_name" {
+  description = "CD pipeline display name when enabled."
+  value       = length(azuredevops_build_definition.cd) > 0 ? azuredevops_build_definition.cd[0].name : null
+}

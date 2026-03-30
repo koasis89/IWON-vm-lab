@@ -104,3 +104,71 @@ resource "azuredevops_check_approval" "prod" {
   timeout               = var.prod_approval_timeout_minutes
   instructions          = "Production deployment approval is required."
 }
+
+# ---------------------------------------------------------------------------
+# Service Connection: Azure Resource Manager (SP 인증)
+# ---------------------------------------------------------------------------
+resource "azuredevops_serviceendpoint_azurerm" "this" {
+  count = var.create_service_connection ? 1 : 0
+
+  project_id            = local.project_id
+  service_endpoint_name = var.service_connection_name
+  description           = "Azure ARM service connection managed by Terraform"
+
+  environment               = "AzureCloud"
+  azurerm_spn_tenantid      = var.azure_tenant_id
+  azurerm_subscription_id   = var.azure_subscription_id
+  azurerm_subscription_name = var.azure_subscription_name
+
+  credentials {
+    serviceprincipalid  = var.azure_client_id
+    serviceprincipalkey = var.azure_client_secret
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Service Connection: GitHub (파이프라인 YAML 소스 fetch 용)
+# gitops_repo_type = "GitHub" 일 때만 생성
+# ---------------------------------------------------------------------------
+resource "azuredevops_serviceendpoint_github" "this" {
+  count = var.create_pipeline && var.gitops_repo_type == "GitHub" ? 1 : 0
+
+  project_id            = local.project_id
+  service_endpoint_name = var.github_service_connection_name
+
+  auth_personal {
+    personal_access_token = var.github_pat
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Pipeline 등록: gitops/ansible/azure-pipelines-vm.yml
+# ---------------------------------------------------------------------------
+resource "azuredevops_build_definition" "cd" {
+  count = var.create_pipeline ? 1 : 0
+
+  project_id = local.project_id
+  name       = var.pipeline_name
+  path       = "\\"
+
+  repository {
+    repo_type   = var.gitops_repo_type
+    repo_id     = var.gitops_repo_id
+    branch_name = var.gitops_branch
+    yml_path    = var.pipeline_yaml_path
+
+    service_connection_id = var.gitops_repo_type == "GitHub" ? azuredevops_serviceendpoint_github.this[0].id : null
+  }
+}
+
+# ---------------------------------------------------------------------------
+# 파이프라인에 ARM 서비스 커넥션 사용 권한 부여
+# ---------------------------------------------------------------------------
+resource "azuredevops_pipeline_authorization" "sc_arm" {
+  count = var.create_pipeline && var.create_service_connection ? 1 : 0
+
+  project_id  = local.project_id
+  resource_id = azuredevops_serviceendpoint_azurerm.this[0].id
+  type        = "endpoint"
+  pipeline_id = azuredevops_build_definition.cd[0].id
+}
