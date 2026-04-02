@@ -279,6 +279,87 @@ stages:
                     PARAM_DEPLOY_TARGET: ${{ parameters.deployTarget }}
                     PARAM_ARTIFACT_PATTERN: ${{ parameters.artifactPattern }}
 
+                - bash: |
+                    set -euo pipefail
+
+                    if [ -z "${SYSTEM_ACCESSTOKEN:-}" ]; then
+                      echo "##vso[task.logissue type=error]SYSTEM_ACCESSTOKEN is empty. Enable OAuth token access for scripts in this pipeline/job."
+                      exit 1
+                    fi
+
+                    ORG_URL="${SYSTEM_COLLECTIONURI%/}"
+                    ORG_NAME="${ORG_URL##*/}"
+
+                    ENCODED_DEF="$(python - <<'PY'
+import os
+import urllib.parse
+print(urllib.parse.quote(os.environ['PKG_DEF'], safe=''))
+PY
+)"
+
+                    API_URL="https://feeds.dev.azure.com/${ORG_NAME}/_apis/Packaging/Feeds/${FEED_NAME}/Packages?packageNameQuery=${ENCODED_DEF}&protocolType=maven&includeAllVersions=true&api-version=7.1-preview.1"
+                    TMP_JSON="$(mktemp)"
+
+                    HTTP_CODE="$(curl -sS -o "${TMP_JSON}" -w "%{http_code}" -H "Authorization: Bearer ${SYSTEM_ACCESSTOKEN}" "${API_URL}")"
+
+                    if [ "${HTTP_CODE}" = "401" ] || [ "${HTTP_CODE}" = "403" ]; then
+                      echo "##vso[task.logissue type=error]Cannot read Azure Artifacts feed '${FEED_NAME}' (HTTP ${HTTP_CODE}). Verify Build Service read permission for the feed."
+                      exit 1
+                    fi
+
+                    if [ "${HTTP_CODE}" != "200" ]; then
+                      echo "##vso[task.logissue type=error]Package precheck failed with HTTP ${HTTP_CODE}. feed=${FEED_NAME} definition=${PKG_DEF} version=${PKG_VERSION} view=${FEED_VIEW}"
+                      echo "API response (first 500 chars):"
+                      python - <<'PY' "${TMP_JSON}"
+import sys
+from pathlib import Path
+text = Path(sys.argv[1]).read_text(encoding='utf-8', errors='replace')
+print(text[:500])
+PY
+                      exit 1
+                    fi
+
+                    python - <<'PY' "${TMP_JSON}" "${PKG_DEF}" "${PKG_VERSION}" "${FEED_NAME}" "${FEED_VIEW}"
+import json
+import sys
+
+json_path, pkg_def, pkg_version, feed_name, feed_view = sys.argv[1:]
+with open(json_path, 'r', encoding='utf-8') as f:
+    data = json.load(f)
+
+packages = data.get('value', [])
+if not packages:
+    print(f"##vso[task.logissue type=error]Package not found in feed. feed={feed_name} definition={pkg_def} version={pkg_version} view={feed_view}")
+    sys.exit(1)
+
+if str(pkg_version).lower() == 'latest':
+    print(f"Package precheck passed. definition={pkg_def}, version=latest")
+    sys.exit(0)
+
+available = []
+for pkg in packages:
+    for ver in pkg.get('versions', []):
+        version = ver.get('version')
+        if version:
+            available.append(version)
+
+if pkg_version in available:
+    print(f"Package precheck passed. definition={pkg_def}, version={pkg_version}")
+    sys.exit(0)
+
+preview = ', '.join(sorted(set(available), reverse=True)[:10])
+print(f"##vso[task.logissue type=error]Requested version not found. feed={feed_name} definition={pkg_def} requested={pkg_version} available(sample)={preview}")
+sys.exit(1)
+PY
+                  displayName: Precheck Maven package availability
+                  env:
+                    PATH: $(GIT_BASH_DIR);$(PATH)
+                    PKG_DEF: $(EFFECTIVE_MAVEN_DEF)
+                    PKG_VERSION: ${{ parameters.mavenPackageVersion }}
+                    FEED_NAME: ${{ parameters.artifactFeedName }}
+                    FEED_VIEW: ${{ parameters.artifactFeedView }}
+                    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
                 - task: DownloadPackage@1
                   displayName: Download artifact from Maven feed
                   inputs:
