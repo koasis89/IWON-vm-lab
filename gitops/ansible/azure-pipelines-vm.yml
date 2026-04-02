@@ -68,6 +68,8 @@ variables:
     value: iwon
   - name: ANSIBLE_SSH_KEY_PATH
     value: ~/.ssh/id_rsa
+  - name: GIT_BASH_DIR
+    value: C:\Program Files\Git\bin
 
   - name: AZURE_SERVICE_CONNECTION
     value: ""
@@ -133,6 +135,8 @@ stages:
 
                       mkdir -p "$(Pipeline.Workspace)/generated"
                       terraform -chdir="$(TF_WORKING_DIR)" output -json > "$(TF_OUTPUT_JSON)"
+                  env:
+                    PATH: $(GIT_BASH_DIR);$(PATH)
 
                 - publish: $(TF_OUTPUT_JSON)
                   artifact: terraform-output
@@ -189,6 +193,8 @@ stages:
 
                       mkdir -p "$(Pipeline.Workspace)/generated"
                       terraform -chdir="$(TF_WORKING_DIR)" output -json > "$(TF_OUTPUT_JSON)"
+                  env:
+                    PATH: $(GIT_BASH_DIR);$(PATH)
 
                 - bash: |
                     set -euo pipefail
@@ -198,7 +204,7 @@ stages:
                     fi
 
                     if [ -f "$(TF_OUTPUT_JSON)" ]; then
-                      python3 "$(Build.SourcesDirectory)/gitops/scripts/generate_inventory_from_tf.py" \
+                      python "$(Build.SourcesDirectory)/gitops/scripts/generate_inventory_from_tf.py" \
                         --tf-output "$(TF_OUTPUT_JSON)" \
                         --output "$(ANSIBLE_INVENTORY_OUT)" \
                         --ssh-user "$(ANSIBLE_SSH_USER)" \
@@ -212,8 +218,8 @@ stages:
 
                       cp "${STATIC_INVENTORY_SOURCE}" "$(ANSIBLE_INVENTORY_OUT)"
 
-                        sed -i "s|^ansible_user=.*|ansible_user=$(ANSIBLE_SSH_USER)|" "$(ANSIBLE_INVENTORY_OUT)"
-                        sed -i "s|^ansible_ssh_private_key_file=.*|ansible_ssh_private_key_file=$(ANSIBLE_SSH_KEY_PATH)|" "$(ANSIBLE_INVENTORY_OUT)"
+                      sed -i "s|^ansible_user=.*|ansible_user=$(ANSIBLE_SSH_USER)|" "$(ANSIBLE_INVENTORY_OUT)"
+                      sed -i "s|^ansible_ssh_private_key_file=.*|ansible_ssh_private_key_file=$(ANSIBLE_SSH_KEY_PATH)|" "$(ANSIBLE_INVENTORY_OUT)"
 
                       echo "##vso[task.logissue type=warning]Using static inventory fallback: $(STATIC_ANSIBLE_INVENTORY_PATH)"
                     else
@@ -221,6 +227,8 @@ stages:
                       exit 1
                     fi
                   displayName: Generate inventory from Terraform outputs
+                  env:
+                    PATH: $(GIT_BASH_DIR);$(PATH)
 
                 - task: InstallSSHKey@0
                   displayName: Install SSH private key
@@ -231,9 +239,16 @@ stages:
 
                 - bash: |
                     set -euo pipefail
-                    sudo apt-get update
-                    sudo apt-get install -y ansible python3-pip
+                    if command -v apt-get >/dev/null 2>&1; then
+                      sudo apt-get update
+                      sudo apt-get install -y ansible python3-pip
+                    else
+                      python -m pip install --user --upgrade pip
+                      python -m pip install --user ansible
+                    fi
                   displayName: Install Ansible
+                  env:
+                    PATH: $(GIT_BASH_DIR);$(PATH)
 
                 - bash: |
                     set -euo pipefail
@@ -256,6 +271,7 @@ stages:
                     echo "##vso[task.setvariable variable=EFFECTIVE_ARTIFACT_PATTERN]$EFFECTIVE_ARTIFACT_PATTERN"
                   displayName: Resolve package definition and artifact pattern
                   env:
+                    PATH: $(GIT_BASH_DIR);$(PATH)
                     PARAM_MAVEN_DEF: ${{ parameters.mavenPackageDefinition }}
                     PARAM_DEPLOY_TARGET: ${{ parameters.deployTarget }}
                     PARAM_ARTIFACT_PATTERN: ${{ parameters.artifactPattern }}
@@ -284,10 +300,12 @@ stages:
                     echo "##vso[task.setvariable variable=TARGET_ARTIFACT]${TARGET_ARTIFACT}"
                   displayName: Validate downloaded artifact
                   env:
+                    PATH: $(GIT_BASH_DIR);$(PATH)
                     PATTERN: $(EFFECTIVE_ARTIFACT_PATTERN)
 
                 - bash: |
                     set -euo pipefail
+                    export PATH="$PATH:/c/Users/koasi/AppData/Roaming/Python/Python311/Scripts:$HOME/.local/bin"
                     export ANSIBLE_HOST_KEY_CHECKING=False
                     export ANSIBLE_CONFIG="$(Build.SourcesDirectory)/$(ANSIBLE_CONFIG_PATH)"
 
@@ -297,3 +315,5 @@ stages:
                       --limit "${{ parameters.deployTarget }}" \
                       --extra-vars "deployTarget=${{ parameters.deployTarget }} target_artifact=$(TARGET_ARTIFACT)"
                   displayName: Run Ansible deploy playbook
+                  env:
+                    PATH: $(GIT_BASH_DIR);$(PATH)
