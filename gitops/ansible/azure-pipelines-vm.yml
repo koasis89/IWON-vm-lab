@@ -94,11 +94,11 @@ stages:
       - deployment: TerraformApply
         displayName: Apply Terraform
         environment: $(ENVIRONMENT_NAME_INFRA)
+        pool:
+          name: Default
         strategy:
           runOnce:
             deploy:
-              pool:
-                name: Default
               steps:
                 - checkout: self
 
@@ -146,11 +146,11 @@ stages:
       - deployment: DeployByAnsible
         displayName: Deploy target service
         environment: $(ENVIRONMENT_NAME_APP)
+        pool:
+          name: Default
         strategy:
           runOnce:
             deploy:
-              pool:
-                name: Default
               steps:
                 - checkout: self
 
