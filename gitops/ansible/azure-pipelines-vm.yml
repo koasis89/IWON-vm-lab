@@ -290,12 +290,7 @@ stages:
                     ORG_URL="${SYSTEM_COLLECTIONURI%/}"
                     ORG_NAME="${ORG_URL##*/}"
 
-                    ENCODED_DEF="$(python - <<'PY'
-import os
-import urllib.parse
-print(urllib.parse.quote(os.environ['PKG_DEF'], safe=''))
-PY
-)"
+                    ENCODED_DEF="$(python -c "import os,urllib.parse; print(urllib.parse.quote(os.environ['PKG_DEF'], safe=''))")"
 
                     API_URL="https://feeds.dev.azure.com/${ORG_NAME}/_apis/Packaging/Feeds/${FEED_NAME}/Packages?packageNameQuery=${ENCODED_DEF}&protocolType=maven&includeAllVersions=true&api-version=7.1-preview.1"
                     TMP_JSON="$(mktemp)"
@@ -309,48 +304,22 @@ PY
 
                     if [ "${HTTP_CODE}" != "200" ]; then
                       echo "##vso[task.logissue type=error]Package precheck failed with HTTP ${HTTP_CODE}. feed=${FEED_NAME} definition=${PKG_DEF} version=${PKG_VERSION} view=${FEED_VIEW}"
-                      echo "API response (first 500 chars):"
-                      python - <<'PY' "${TMP_JSON}"
-import sys
-from pathlib import Path
-text = Path(sys.argv[1]).read_text(encoding='utf-8', errors='replace')
-print(text[:500])
-PY
+                      echo "API response:"; head -c 500 "${TMP_JSON}"
                       exit 1
                     fi
 
-                    python - <<'PY' "${TMP_JSON}" "${PKG_DEF}" "${PKG_VERSION}" "${FEED_NAME}" "${FEED_VIEW}"
-import json
-import sys
-
-json_path, pkg_def, pkg_version, feed_name, feed_view = sys.argv[1:]
-with open(json_path, 'r', encoding='utf-8') as f:
-    data = json.load(f)
-
-packages = data.get('value', [])
-if not packages:
-    print(f"##vso[task.logissue type=error]Package not found in feed. feed={feed_name} definition={pkg_def} version={pkg_version} view={feed_view}")
-    sys.exit(1)
-
-if str(pkg_version).lower() == 'latest':
-    print(f"Package precheck passed. definition={pkg_def}, version=latest")
-    sys.exit(0)
-
-available = []
-for pkg in packages:
-    for ver in pkg.get('versions', []):
-        version = ver.get('version')
-        if version:
-            available.append(version)
-
-if pkg_version in available:
-    print(f"Package precheck passed. definition={pkg_def}, version={pkg_version}")
-    sys.exit(0)
-
-preview = ', '.join(sorted(set(available), reverse=True)[:10])
-print(f"##vso[task.logissue type=error]Requested version not found. feed={feed_name} definition={pkg_def} requested={pkg_version} available(sample)={preview}")
-sys.exit(1)
-PY
+                    PYCHECK="$(mktemp --suffix=.py)"
+                    printf 'import json,sys\n' > "${PYCHECK}"
+                    printf 'jp,pd,pv,fn,fv=sys.argv[1:]\n' >> "${PYCHECK}"
+                    printf 'data=json.load(open(jp))\n' >> "${PYCHECK}"
+                    printf 'pkgs=data.get("value",[])\n' >> "${PYCHECK}"
+                    printf 'if not pkgs: print(f"##vso[task.logissue type=error]Package not found. feed={fn} def={pd} ver={pv}"); sys.exit(1)\n' >> "${PYCHECK}"
+                    printf 'if pv.lower()=="latest": print(f"Precheck passed: {pd} latest"); sys.exit(0)\n' >> "${PYCHECK}"
+                    printf 'avail=[v.get("version") for p in pkgs for v in p.get("versions",[]) if v.get("version")]\n' >> "${PYCHECK}"
+                    printf 'if pv in avail: print(f"Precheck passed: {pd}=={pv}"); sys.exit(0)\n' >> "${PYCHECK}"
+                    printf 'samp=", ".join(sorted(set(avail),reverse=True)[:10])\n' >> "${PYCHECK}"
+                    printf 'print(f"##vso[task.logissue type=error]Version not found. def={pd} req={pv} avail={samp}"); sys.exit(1)\n' >> "${PYCHECK}"
+                    python "${PYCHECK}" "${TMP_JSON}" "${PKG_DEF}" "${PKG_VERSION}" "${FEED_NAME}" "${FEED_VIEW}"
                   displayName: Precheck Maven package availability
                   env:
                     PATH: $(GIT_BASH_DIR);$(PATH)
