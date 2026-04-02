@@ -234,6 +234,8 @@ stages:
                   displayName: Install SSH private key
                   inputs:
                     addEntryToConfig: false
+                    hostName: bastion01
+                    userName: $(ANSIBLE_SSH_USER)
                     knownHostsEntry: ""
                     sshPublicKey: ""
                     sshKeySecureFile: $(ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE)
