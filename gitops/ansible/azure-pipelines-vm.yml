@@ -233,6 +233,7 @@ stages:
                 - task: InstallSSHKey@0
                   displayName: Install SSH private key
                   inputs:
+                    addEntryToConfig: false
                     knownHostsEntry: ""
                     sshPublicKey: ""
                     sshKeySecureFile: $(ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE)
