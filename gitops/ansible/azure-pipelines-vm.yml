@@ -44,8 +44,6 @@ parameters:
     default: ""
 
 variables:
-  - group: iwon-smart-ops-vg
-
   - name: ENVIRONMENT_NAME_INFRA
     value: iwon-gitops-infra
   - name: ENVIRONMENT_NAME_APP
@@ -72,7 +70,7 @@ variables:
   - name: AZURE_SERVICE_CONNECTION
     value: ""
   - name: ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE
-    value: ""
+    value: "id_rsa"
 
   - name: TFSTATE_RG
     value: ""
@@ -82,6 +80,9 @@ variables:
     value: tfstate
   - name: TFSTATE_KEY
     value: vm-azure/prod.tfstate
+
+  # Variable Group values override defaults above when same variable names exist.
+  - group: iwon-smart-ops-vg
 
 stages:
   - stage: Terraform
@@ -107,7 +108,7 @@ stages:
                 - task: AzureCLI@2
                   displayName: Terraform init/validate/plan/apply
                   inputs:
-                    azureSubscription: $(AZURE_SERVICE_CONNECTION)
+                    azureSubscription: iwon-smart-ops-sc
                     scriptType: bash
                     scriptLocation: inlineScript
                     inlineScript: |
@@ -167,7 +168,7 @@ stages:
                   displayName: Export Terraform outputs when Terraform stage is skipped
                   condition: eq('${{ parameters.runTerraform }}', false)
                   inputs:
-                    azureSubscription: $(AZURE_SERVICE_CONNECTION)
+                    azureSubscription: iwon-smart-ops-sc
                     scriptType: bash
                     scriptLocation: inlineScript
                     inlineScript: |

@@ -261,8 +261,24 @@ ARM 값 확보 절차/명령은 IaC 실행 단계인 1.1.1에서 수행한다.
 - `TFSTATE_STORAGE`
 - `ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE`
 
-2. Library/Variable Group 사용 시 연결 여부 확인
+2. Library/Variable Group(`iwon-smart-ops-vg`) 사용 시 연결 여부 확인
+	- 권장 변수 추가:
+	  - `ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE = id_rsa`
+	  - `TFSTATE_RG = <backend-rg>`
+	  - `TFSTATE_STORAGE = <backend-storage-account>`
 3. Secure Files에 SSH 키 등록
+	- 파일명은 `id_rsa`로 업로드(파이프라인 기본값과 동일)
+	- 파이프라인의 `InstallSSHKey@0`는 `sshKeySecureFile: $(ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE)`를 사용
+
+주의:
+1. `AzureCLI@2`의 `azureSubscription` 입력은 실행 전 validation 단계에서 해석되므로 변수(`$(AZURE_SERVICE_CONNECTION)`) 대신 실제 Service Connection 이름을 직접 사용한다.
+2. 현재 기준 하드코딩 값은 `iwon-smart-ops-sc` 이다.
+
+정상 등록 방법:
+1. Azure DevOps 포털 > Pipelines > Library > Secure files 에 `id_rsa` 업로드
+2. 파이프라인 변수 `ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE` 값을 `id_rsa`로 설정
+3. 첫 실행 시 리소스 권한 Authorize
+4. 재실행 후 `InstallSSHKey` 단계 통과 확인
 
 검증 기준:
 - Pipeline 편집 화면에서 변수 참조 오류 없음

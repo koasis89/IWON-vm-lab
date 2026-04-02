@@ -1,0 +1,17 @@
+- name: Deploy integration artifact with java_service role
+  ansible.builtin.include_role:
+    name: java_service
+  vars:
+    java_service_name: integration
+    java_service_description: IWON Integration Service
+    java_app_dir: /opt/apps/integration
+    java_jar_local_src: "{{ target_artifact }}"
+    java_jar_remote_name: IWonPaymentIntegration-0.0.1-SNAPSHOT.jar
+    java_log_file: "{{ log_dir }}/integration.log"
+    java_env_vars:
+      KAFKA_BOOTSTRAP_SERVERS: "{{ kafka_client_bootstrap_servers }}"
+      KAFKA_SECURITY_PROTOCOL: "{{ kafka_client_security_protocol }}"
+      KAFKA_TLS_ENABLED: "{{ kafka_client_tls_enabled }}"
+      KAFKA_SASL_ENABLED: "{{ kafka_client_sasl_enabled }}"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: "{{ kafka_client_bootstrap_servers }}"
+      SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL: "{{ kafka_client_security_protocol }}"
