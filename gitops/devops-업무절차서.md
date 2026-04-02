@@ -264,7 +264,7 @@ ARM 값 확보 절차/명령은 IaC 실행 단계인 1.1.1에서 수행한다.
 2. Library/Variable Group(`iwon-smart-ops-vg`) 사용 시 연결 여부 확인
 	- 권장 변수 추가:
 	  - `ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE = id_rsa`
-	  - `TFSTATE_RG = <backend-rg>`
+1ㅂ	ㅂ	ㅂ		ㅂ	`1	11ㅂ1	1````````````````````````ㅂㅂㅁㅁㅂ	ㅂㄴㄴㄴㄴㄴㅋㅋㅁㄴㄵㅂ			11	````````````````111``ㅂㅂ11	  - `TFSTATE_RG = <backend-rg>`
 	  - `TFSTATE_STORAGE = <backend-storage-account>`
 3. Secure Files에 SSH 키 등록
 	- 파일명은 `id_rsa`로 업로드(파이프라인 기본값과 동일)
@@ -286,7 +286,7 @@ ARM 값 확보 절차/명령은 IaC 실행 단계인 1.1.1에서 수행한다.
 
 ---
 
-## 3. GitHub에서 해야 할 절차 (실행순서: 3단계, 마지막)
+## 3. GitHub에서 해야 할 절차 
 
 주의: 이 단계는 Azure DevOps에서 발급한 정보(특히 PAT, Pipeline ID)가 필요하므로 1번/2번 절차와 연동된다.
 
@@ -359,3 +359,554 @@ ARM 값 확보 절차/명령은 IaC 실행 단계인 1.1.1에서 수행한다.
 3. GitHub 단계(3장) 수행: 워크플로우 파일 반영 + `ADO_PAT`/`ADO_PIPELINE_ID` 시크릿 등록
 4. ADO Pipeline 수동 1회 실행 후 정상 확인
 5. 이후 GitHub main 머지 기반 자동 실행 전환
+
+---
+
+## 6. 실제 운영 전환 기준: 소스 저장소별 GitHub Actions 적용 순서
+
+이 절차는 1단계(Terraform)와 2단계(ADO Portal)가 완료된 이후 수행한다.  
+대상 저장소: `IWonPaymentWeb`, `IWonPaymentApp`, `IWonPaymentIntegration`
+
+---
+
+### 6.0 사전 조건 확인 (착수 전 필수)
+
+| 항목 | 확인 방법 | 기대값 |
+|---|---|---|
+| ADO Pipeline ID 확보 | `terraform output pipeline_id` | 숫자 (예: `2`) |
+| Azure Artifacts Feed 정상 | ADO > Artifacts > `iwon-smart-feed` | Feed 조회 가능 |
+| ADO PAT 발급 완료 | 2.2절에서 생성 | Pipelines R&E + Artifacts R&W |
+| Service Connection 준비 | `az devops service-endpoint list` → isReady=True | `iwon-smart-ops-sc` |
+| 소스 저장소 Admin 또는 Write 권한 | GitHub 저장소 Settings 접근 가능 여부 | Secrets/Variables 탭 열림 |
+
+착수 차단 조건:
+- `ADO_PIPELINE_ID`가 없으면 REST API 호출 대상이 없으므로 3단계를 착수할 수 없다.
+- Azure Artifacts Feed가 없으면 `publish` 단계에서 즉시 실패한다.
+
+---
+
+### 6.1 build.gradle 공통 설정 (maven-publish)
+
+모든 소스 저장소에 아래 설정을 `build.gradle`에 적용한다.  
+`publishing` 블록이 이미 있으면 `url`과 `credentials` 항목만 확인/교체한다.
+
+```gradle
+plugins {
+    id 'java'
+    id 'maven-publish'
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            groupId = 'com.iteyes.smart'
+            // artifactId는 각 모듈별로 지정 (아래 6.2~6.4 참조)
+            artifactId = project.name
+            version = System.getenv("APP_VERSION") ?: "0.0.0-local"
+        }
+    }
+    repositories {
+        maven {
+            url 'https://pkgs.dev.azure.com/iteyes-ito/iwon-smart-ops/_packaging/iwon-smart-feed/maven/v1'
+            credentials {
+                username = "AZURE_DEVOPS_PAT"
+                password = System.getenv("AZURE_ARTIFACTS_ENV_ACCESS_TOKEN")
+            }
+        }
+    }
+}
+```
+
+주의:
+- `AZURE_ARTIFACTS_ENV_ACCESS_TOKEN`은 GitHub Secrets의 `ADO_PAT` 값으로 채운다.
+- `APP_VERSION`은 GitHub Actions 워크플로우 내에서 `$GITHUB_ENV`로 주입한다 (예: `1.0.0-main.7c2d9a1`).
+- `0.0.0-local`은 로컬 수동 빌드 시 버전 미설정 식별용이다. 실제 배포에는 사용되지 않는다.
+
+---
+
+### 6.2 IWonPaymentWeb 저장소 (web + was 폴더 분리)
+
+#### 6.2.1 build.gradle 모듈 artifactId 지정
+
+`web/build.gradle`:
+```gradle
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = 'smart-web'
+        }
+    }
+}
+```
+
+`was/build.gradle`:
+```gradle
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = 'smart-was'
+        }
+    }
+}
+```
+
+#### 6.2.2 시크릿 등록 (GitHub > Settings > Secrets and variables > Actions)
+
+| 시크릿 이름 | 값 | 비고 |
+|---|---|---|
+| `ADO_PAT` | Azure DevOps PAT | Pipelines R&E + Artifacts R&W |
+| `ADO_PIPELINE_ID` | `2` (terraform output 기준) | 파이프라인 ID |
+
+고정값(변수 또는 시크릿 중 선택):
+- `ADO_ORG = iteyes-ito`
+- `ADO_PROJECT = iwon-smart-ops`
+- Secrets 대신 Actions > Variables에 등록 가능 (비민감 값)
+
+#### 6.2.3 `.github/workflows/deploy-web.yml` 생성
+
+```yaml
+name: Deploy Web Artifact
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "web/**"
+
+jobs:
+  build-publish-trigger:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      ADO_ORG: iteyes-ito
+      ADO_PROJECT: iwon-smart-ops
+      ADO_PIPELINE_ID: ${{ secrets.ADO_PIPELINE_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Compute immutable version
+        run: |
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          echo "APP_VERSION=1.0.0-main.${SHORT_SHA}" >> "$GITHUB_ENV"
+
+      - name: Build web module
+        run: chmod +x gradlew && ./gradlew :web:build -x test
+
+      - name: Publish web package to Azure Artifacts
+        run: ./gradlew :web:publish
+        env:
+          APP_VERSION: ${{ env.APP_VERSION }}
+          AZURE_ARTIFACTS_ENV_ACCESS_TOKEN: ${{ secrets.ADO_PAT }}
+
+      - name: Trigger Azure DevOps deploy (web)
+        env:
+          ADO_PAT: ${{ secrets.ADO_PAT }}
+        run: |
+          set -euo pipefail
+          API_URL="https://dev.azure.com/${ADO_ORG}/${ADO_PROJECT}/_apis/pipelines/${ADO_PIPELINE_ID}/runs?api-version=7.1"
+          cat > run-pipeline.json <<EOF
+          {
+            "resources": {
+              "repositories": {
+                "self": {
+                  "refName": "refs/heads/main"
+                }
+              }
+            },
+            "templateParameters": {
+              "runTerraform": "false",
+              "deployTarget": "web",
+              "artifactFeedName": "iwon-smart-feed",
+              "artifactFeedView": "",
+              "mavenPackageDefinition": "com.iteyes.smart:smart-web",
+              "mavenPackageVersion": "${APP_VERSION}",
+              "artifactPattern": "*.zip"
+            }
+          }
+          EOF
+          RESPONSE=$(curl --fail --silent --show-error \
+            -u ":${ADO_PAT}" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            --data @run-pipeline.json \
+            "${API_URL}")
+          echo "ADO Pipeline Run ID: $(echo "${RESPONSE}" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("id","unknown"))')"
+```
+
+#### 6.2.4 `.github/workflows/deploy-was.yml` 생성
+
+```yaml
+name: Deploy WAS Artifact
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "was/**"
+
+jobs:
+  build-publish-trigger:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      ADO_ORG: iteyes-ito
+      ADO_PROJECT: iwon-smart-ops
+      ADO_PIPELINE_ID: ${{ secrets.ADO_PIPELINE_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Compute immutable version
+        run: |
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          echo "APP_VERSION=1.0.0-main.${SHORT_SHA}" >> "$GITHUB_ENV"
+
+      - name: Build was module
+        run: chmod +x gradlew && ./gradlew :was:build -x test
+
+      - name: Publish was package to Azure Artifacts
+        run: ./gradlew :was:publish
+        env:
+          APP_VERSION: ${{ env.APP_VERSION }}
+          AZURE_ARTIFACTS_ENV_ACCESS_TOKEN: ${{ secrets.ADO_PAT }}
+
+      - name: Trigger Azure DevOps deploy (was)
+        env:
+          ADO_PAT: ${{ secrets.ADO_PAT }}
+        run: |
+          set -euo pipefail
+          API_URL="https://dev.azure.com/${ADO_ORG}/${ADO_PROJECT}/_apis/pipelines/${ADO_PIPELINE_ID}/runs?api-version=7.1"
+          cat > run-pipeline.json <<EOF
+          {
+            "resources": {
+              "repositories": {
+                "self": {
+                  "refName": "refs/heads/main"
+                }
+              }
+            },
+            "templateParameters": {
+              "runTerraform": "false",
+              "deployTarget": "was",
+              "artifactFeedName": "iwon-smart-feed",
+              "artifactFeedView": "",
+              "mavenPackageDefinition": "com.iteyes.smart:smart-was",
+              "mavenPackageVersion": "${APP_VERSION}",
+              "artifactPattern": "*.jar"
+            }
+          }
+          EOF
+          RESPONSE=$(curl --fail --silent --show-error \
+            -u ":${ADO_PAT}" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            --data @run-pipeline.json \
+            "${API_URL}")
+          echo "ADO Pipeline Run ID: $(echo "${RESPONSE}" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("id","unknown"))')"
+```
+
+---
+
+### 6.3 IWonPaymentApp 저장소
+
+#### 6.3.1 build.gradle artifactId 지정
+
+```gradle
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = 'smart-app'
+        }
+    }
+}
+```
+
+#### 6.3.2 시크릿 등록
+
+IWonPaymentWeb와 동일 항목(`ADO_PAT`, `ADO_PIPELINE_ID`).
+
+#### 6.3.3 `.github/workflows/deploy-app.yml` 생성
+
+```yaml
+name: Deploy App Artifact
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-publish-trigger:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      ADO_ORG: iteyes-ito
+      ADO_PROJECT: iwon-smart-ops
+      ADO_PIPELINE_ID: ${{ secrets.ADO_PIPELINE_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Compute immutable version
+        run: |
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          echo "APP_VERSION=1.0.0-main.${SHORT_SHA}" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: chmod +x gradlew && ./gradlew build -x test
+
+      - name: Publish app package to Azure Artifacts
+        run: ./gradlew publish
+        env:
+          APP_VERSION: ${{ env.APP_VERSION }}
+          AZURE_ARTIFACTS_ENV_ACCESS_TOKEN: ${{ secrets.ADO_PAT }}
+
+      - name: Trigger Azure DevOps deploy (app)
+        env:
+          ADO_PAT: ${{ secrets.ADO_PAT }}
+        run: |
+          set -euo pipefail
+          API_URL="https://dev.azure.com/${ADO_ORG}/${ADO_PROJECT}/_apis/pipelines/${ADO_PIPELINE_ID}/runs?api-version=7.1"
+          cat > run-pipeline.json <<EOF
+          {
+            "resources": {
+              "repositories": {
+                "self": {
+                  "refName": "refs/heads/main"
+                }
+              }
+            },
+            "templateParameters": {
+              "runTerraform": "false",
+              "deployTarget": "app",
+              "artifactFeedName": "iwon-smart-feed",
+              "artifactFeedView": "",
+              "mavenPackageDefinition": "com.iteyes.smart:smart-app",
+              "mavenPackageVersion": "${APP_VERSION}",
+              "artifactPattern": "*.jar"
+            }
+          }
+          EOF
+          RESPONSE=$(curl --fail --silent --show-error \
+            -u ":${ADO_PAT}" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            --data @run-pipeline.json \
+            "${API_URL}")
+          echo "ADO Pipeline Run ID: $(echo "${RESPONSE}" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("id","unknown"))')"
+```
+
+---
+
+### 6.4 IWonPaymentIntegration 저장소
+
+#### 6.4.1 build.gradle artifactId 지정
+
+```gradle
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = 'smart-integration'
+        }
+    }
+}
+```
+
+#### 6.4.2 시크릿 등록
+
+IWonPaymentWeb와 동일 항목(`ADO_PAT`, `ADO_PIPELINE_ID`).
+
+#### 6.4.3 `.github/workflows/deploy-integration.yml` 생성
+
+```yaml
+name: Deploy Integration Artifact
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-publish-trigger:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      ADO_ORG: iteyes-ito
+      ADO_PROJECT: iwon-smart-ops
+      ADO_PIPELINE_ID: ${{ secrets.ADO_PIPELINE_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Compute immutable version
+        run: |
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          echo "APP_VERSION=1.0.0-main.${SHORT_SHA}" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: chmod +x gradlew && ./gradlew build -x test
+
+      - name: Publish integration package to Azure Artifacts
+        run: ./gradlew publish
+        env:
+          APP_VERSION: ${{ env.APP_VERSION }}
+          AZURE_ARTIFACTS_ENV_ACCESS_TOKEN: ${{ secrets.ADO_PAT }}
+
+      - name: Trigger Azure DevOps deploy (integration)
+        env:
+          ADO_PAT: ${{ secrets.ADO_PAT }}
+        run: |
+          set -euo pipefail
+          API_URL="https://dev.azure.com/${ADO_ORG}/${ADO_PROJECT}/_apis/pipelines/${ADO_PIPELINE_ID}/runs?api-version=7.1"
+          cat > run-pipeline.json <<EOF
+          {
+            "resources": {
+              "repositories": {
+                "self": {
+                  "refName": "refs/heads/main"
+                }
+              }
+            },
+            "templateParameters": {
+              "runTerraform": "false",
+              "deployTarget": "integration",
+              "artifactFeedName": "iwon-smart-feed",
+              "artifactFeedView": "",
+              "mavenPackageDefinition": "com.iteyes.smart:smart-integration",
+              "mavenPackageVersion": "${APP_VERSION}",
+              "artifactPattern": "*.jar"
+            }
+          }
+          EOF
+          RESPONSE=$(curl --fail --silent --show-error \
+            -u ":${ADO_PAT}" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            --data @run-pipeline.json \
+            "${API_URL}")
+          echo "ADO Pipeline Run ID: $(echo "${RESPONSE}" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("id","unknown"))')"
+```
+
+---
+
+### 6.5 PAT 발급 권한 기준 (운영 전환 시 필수)
+
+| PAT 용도 | 필요 권한 범위 | 권장 만료 |
+|---|---|---|
+| Azure Artifacts publish | `Artifacts: Read & Write` | 90일, 자동 순환 |
+| ADO Pipeline REST 호출 | `Pipelines: Read & execute` | 90일, 자동 순환 |
+| GitHub 서비스 커넥션 (iwon-github-sc) | `repo: full` 또는 `repo: status` | 90일, 자동 순환 |
+
+PoC에서는 위 3가지 권한을 단일 PAT에 통합 가능하다.  
+운영 전환 시에는 publish 전용 PAT와 pipeline 호출 전용 PAT를 분리한다.
+
+PAT 순환 절차:
+1. ADO Portal에서 신규 PAT 발급
+2. 각 소스 저장소 GitHub Secrets의 `ADO_PAT` 값을 신규 PAT로 교체
+3. 구 PAT 즉시 revoke
+
+---
+
+### 6.6 브랜치 보호 규칙 (운영 전환 시 필수)
+
+각 소스 저장소(IWonPaymentWeb / IWonPaymentApp / IWonPaymentIntegration) 공통 적용:
+
+1. `main` 브랜치 보호 설정 경로:
+   - GitHub > Repository > Settings > Branches > Add branch protection rule
+   - Branch name pattern: `main`
+
+2. 권장 설정:
+
+| 항목 | 설정값 | 이유 |
+|---|---|---|
+| Require a pull request before merging | ON | 직접 push 차단 |
+| Require approvals | 1명 이상 | 코드 리뷰 보장 |
+| Require status checks to pass before merging | ON | CI 통과 강제 |
+| Do not allow bypassing the above settings | ON | Admin 포함 우회 차단 |
+
+PoC 단계에서는 status checks 항목을 먼저 OFF로 유지하고, 워크플로우 정상 동작 확인 후 ON으로 전환한다.
+
+---
+
+### 6.7 적용 순서 요약 (저장소별 작업 체크리스트)
+
+아래 체크리스트를 저장소별로 순서대로 수행한다.
+
+#### IWonPaymentWeb
+
+- [ ] 1. `terraform output pipeline_id` 값 확인 → `ADO_PIPELINE_ID = 2` 확보
+- [ ] 2. ADO PAT 발급 (Artifacts R&W + Pipelines R&E)
+- [ ] 3. GitHub Secrets 등록: `ADO_PAT`, `ADO_PIPELINE_ID`
+- [ ] 4. GitHub Variables 등록 (선택): `ADO_ORG=iteyes-ito`, `ADO_PROJECT=iwon-smart-ops`
+- [ ] 5. `web/build.gradle` 및 `was/build.gradle`에 `maven-publish` 설정 추가/확인
+- [ ] 6. `.github/workflows/deploy-web.yml` 생성 및 커밋
+- [ ] 7. `.github/workflows/deploy-was.yml` 생성 및 커밋
+- [ ] 8. `web/**` 경로 파일 변경 후 main 머지 → deploy-web.yml 실행 확인
+- [ ] 9. ADO Pipeline 실행 로그에서 `deployTarget=web` 배포 정상 확인
+- [ ] 10. `was/**` 경로 파일 변경 후 main 머지 → deploy-was.yml 실행 확인
+- [ ] 11. ADO Pipeline 실행 로그에서 `deployTarget=was` 배포 정상 확인
+- [ ] 12. (운영 전환 시) main 브랜치 보호 규칙 설정
+
+#### IWonPaymentApp
+
+- [ ] 1. GitHub Secrets 등록: `ADO_PAT`, `ADO_PIPELINE_ID`
+- [ ] 2. `build.gradle`에 `maven-publish` 설정 추가/확인 (`artifactId = smart-app`)
+- [ ] 3. `.github/workflows/deploy-app.yml` 생성 및 커밋
+- [ ] 4. main 머지 후 Actions 탭에서 워크플로우 실행 확인
+- [ ] 5. ADO Pipeline 로그에서 `deployTarget=app` 배포 정상 확인
+- [ ] 6. (운영 전환 시) main 브랜치 보호 규칙 설정
+
+#### IWonPaymentIntegration
+
+- [ ] 1. GitHub Secrets 등록: `ADO_PAT`, `ADO_PIPELINE_ID`
+- [ ] 2. `build.gradle`에 `maven-publish` 설정 추가/확인 (`artifactId = smart-integration`)
+- [ ] 3. `.github/workflows/deploy-integration.yml` 생성 및 커밋
+- [ ] 4. main 머지 후 Actions 탭에서 워크플로우 실행 확인
+- [ ] 5. ADO Pipeline 로그에서 `deployTarget=integration` 배포 정상 확인
+- [ ] 6. (운영 전환 시) main 브랜치 보호 규칙 설정
+
+---
+
+### 6.8 트리거 연결 검증 기준
+
+각 저장소별로 아래 3가지 단계가 순서대로 통과되어야 완료로 간주한다.
+
+| 단계 | 검증 항목 | 확인 위치 |
+|---|---|---|
+| 1. 빌드 성공 | Gradle build 성공, `-x test` 기준 | GitHub Actions > 해당 워크플로우 로그 |
+| 2. Feed publish 성공 | `APP_VERSION` 기준 버전이 Feed에 등록됨 | ADO > Artifacts > `iwon-smart-feed` > 버전 목록 |
+| 3. ADO 파이프라인 기동 | curl 호출 후 `Run ID` 반환, ADO에서 실행 내역 확인 | ADO > Pipelines > `iwon-vm-cd` > 최근 실행 |
+
+3단계가 모두 통과하면 GitOps 자동 배포 체인이 정상 연결된 것이다.

@@ -57,6 +57,8 @@ variables:
     value: $(Pipeline.Workspace)/generated/tf-output.json
   - name: ANSIBLE_INVENTORY_OUT
     value: $(Pipeline.Workspace)/generated/inventory.generated.ini
+  - name: STATIC_ANSIBLE_INVENTORY_PATH
+    value: vm-ansible/inventory.ini
 
   - name: ANSIBLE_PLAYBOOK_PATH
     value: gitops/ansible/deploy-playbook.yml
@@ -175,8 +177,8 @@ stages:
                       set -euo pipefail
 
                       if [ -z "$(TFSTATE_RG)" ] || [ -z "$(TFSTATE_STORAGE)" ]; then
-                        echo "TFSTATE_RG/TFSTATE_STORAGE must be configured for managed agent runs."
-                        exit 1
+                        echo "##vso[task.logissue type=warning]TFSTATE_RG/TFSTATE_STORAGE is not configured. Falling back to static inventory for PoC run."
+                        exit 0
                       fi
 
                       terraform -chdir="$(TF_WORKING_DIR)" init \
@@ -195,11 +197,45 @@ stages:
                       cp "$(Pipeline.Workspace)/downloaded-terraform/tf-output.json" "$(TF_OUTPUT_JSON)"
                     fi
 
-                    python3 "$(Build.SourcesDirectory)/gitops/scripts/generate_inventory_from_tf.py" \
-                      --tf-output "$(TF_OUTPUT_JSON)" \
-                      --output "$(ANSIBLE_INVENTORY_OUT)" \
-                      --ssh-user "$(ANSIBLE_SSH_USER)" \
-                      --ssh-key-path "$(ANSIBLE_SSH_KEY_PATH)"
+                    if [ -f "$(TF_OUTPUT_JSON)" ]; then
+                      python3 "$(Build.SourcesDirectory)/gitops/scripts/generate_inventory_from_tf.py" \
+                        --tf-output "$(TF_OUTPUT_JSON)" \
+                        --output "$(ANSIBLE_INVENTORY_OUT)" \
+                        --ssh-user "$(ANSIBLE_SSH_USER)" \
+                        --ssh-key-path "$(ANSIBLE_SSH_KEY_PATH)"
+                    elif [ -z "$(TFSTATE_RG)" ] || [ -z "$(TFSTATE_STORAGE)" ]; then
+                      STATIC_INVENTORY_SOURCE="$(Build.SourcesDirectory)/$(STATIC_ANSIBLE_INVENTORY_PATH)"
+                      if [ ! -f "${STATIC_INVENTORY_SOURCE}" ]; then
+                        echo "static inventory not found: ${STATIC_INVENTORY_SOURCE}"
+                        exit 1
+                      fi
+
+                      cp "${STATIC_INVENTORY_SOURCE}" "$(ANSIBLE_INVENTORY_OUT)"
+
+                      python3 - "$(ANSIBLE_INVENTORY_OUT)" "$(ANSIBLE_SSH_USER)" "$(ANSIBLE_SSH_KEY_PATH)" <<'PY'
+from pathlib import Path
+import sys
+
+inventory_path = Path(sys.argv[1])
+ssh_user = sys.argv[2]
+ssh_key_path = sys.argv[3]
+lines = inventory_path.read_text(encoding='utf-8').splitlines()
+updated = []
+for line in lines:
+    if line.startswith('ansible_user='):
+        updated.append(f'ansible_user={ssh_user}')
+    elif line.startswith('ansible_ssh_private_key_file='):
+        updated.append(f'ansible_ssh_private_key_file={ssh_key_path}')
+    else:
+        updated.append(line)
+inventory_path.write_text('\n'.join(updated) + '\n', encoding='utf-8')
+PY
+
+                      echo "##vso[task.logissue type=warning]Using static inventory fallback: $(STATIC_ANSIBLE_INVENTORY_PATH)"
+                    else
+                      echo "Terraform outputs were not generated even though TFSTATE variables are configured."
+                      exit 1
+                    fi
                   displayName: Generate inventory from Terraform outputs
 
                 - task: InstallSSHKey@0

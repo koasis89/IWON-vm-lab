@@ -423,3 +423,251 @@ az devops invoke --organization https://dev.azure.com/iteyes-ito --area distribu
 ### 현재 판정
 - 파이프라인 YAML 수정 완료
 - 다음 실행에서 동일 validation 오류는 제거될 것으로 예상
+
+먼저 현재 파이프라인 YAML 상태와 git 상태를 동시에 확인합니다.  
+
+Ran terminal command: git log --oneline -5; git status --short
+
+읽기 [](file:///c%3A/Workspace/IWON-vm-lab/gitops/ansible/azure-pipelines-vm.yml#1-1), 1 줄에서 80 줄까지
+
+git 상태 파악됐습니다. YAML은 이미 원격에 push된 상태이고 `id_rsa` 기본값도 보입니다. 이제 핵심 수정 사항인 `azureSubscription` 하드코딩과 Variable Group 위치를 확인합니다. 
+
+읽기 [](file:///c%3A/Workspace/IWON-vm-lab/gitops/ansible/azure-pipelines-vm.yml#80-80), 80 줄에서 200 줄까지
+
+모든 핵심 수정 사항을 확인했습니다.
+
+**검증 결과 요약:**
+
+| 수정 항목 | 위치 | 현재 상태 |
+|---|---|---|
+| `ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE` 기본값 | variables 블록 | ✅ `"id_rsa"` 설정됨 |
+| Variable Group 위치 | variables 블록 마지막 | ✅ `- group: iwon-smart-ops-vg`가 모든 variable 정의 이후 |
+| `azureSubscription` 하드코딩 (TerraformApply job) | AzureCLI@2 | ✅ `iwon-smart-ops-sc` 하드코딩 |
+| `azureSubscription` 하드코딩 (DeployByAnsible job) | AzureCLI@2 | ✅ `iwon-smart-ops-sc` 하드코딩 |
+| 원격 반영 여부 | `origin/main` | ✅ `f07c864` 커밋으로 이미 push 완료 |
+
+**현재 미커밋 파일:**
+```
+M gitops/devops-업무절차서.md
+```
+이 세션에서 섹션 6을 추가한 업무절차서만 uncommitted 상태입니다. 커밋/푸시가 필요하면 말씀해 주세요.
+
+**파이프라인 재실행 가능 여부:** fix는 이미 `origin/main`에 반영되어 있으므로 바로 재실행 가능합니다.
+```powershell
+$env:AZDO_PERSONAL_ACCESS_TOKEN="<ado-pat>"
+az pipelines run --organization https://dev.azure.com/iteyes-ito --project iwon-smart-ops --id 2 --branch main --output json
+```
+이전 `azureSubscription references service connection` 오류는 이미 수정되어 있으므로 다음 실패 지점은 `TFSTATE_RG`/`TFSTATE_STORAGE` 미설정 여부일 가능성이 높습니다.
+
+## 6.0 사전 조건 확인 결과
+
+| 항목 | 확인 결과 | 비고 |
+|---|---|---|
+| ✅ ADO Pipeline ID | **2** | URL `definitionId=2` 확인 |
+| ✅ Azure Artifacts Feed | **조회 가능** | `iwon-smart-feed` 정상 접근 |
+| ✅ ADO PAT 발급 | **Active** | `iwon-smart-ops` Full access, 만료 2026-06-30 |
+| ✅ Service Connection | **Verification Succeeded** | `iwon-smart-ops-sc` isReady=True |
+| ✅ 소스 저장소 권한 | **Settings 접근 가능** | GitHub Secrets/Variables 탭 열림 |
+
+모든 사전 조건 **통과**입니다.
+
+---
+## 6.0 사전 조건 확인 (착수 전 필수)
+
+| 항목 | 확인 방법 | 기대값 | 결과 |
+|---|---|---|---|
+| ADO Pipeline ID | URL `definitionId=` 파라미터 확인 | 숫자 (예: 2) | ✅ **2** |
+| Azure Artifacts Feed | ADO > Artifacts > iwon-smart-feed | Feed 조회 가능 | ✅ 정상 |
+| ADO PAT 발급 | ADO User Settings > Personal Access Tokens | Pipelines R&E + Artifacts R&W | ✅ Full access, Active |
+| Service Connection 준비 | Edit > Verify 버튼 클릭 | Verification Succeeded | ✅ iwon-smart-ops-sc |
+| 소스 저장소 권한 | GitHub > Settings > Secrets/Variables 접근 | 탭 열림 | ✅ Admin 권한 확인 |
+
+---
+
+## 1. Secure Files — id_rsa 업로드
+
+**경로:** ADO > Pipelines > Library > Secure files
+
+1. `+ Secure file` 클릭
+2. `id_rsa` 파일 선택 후 업로드
+3. 업로드 완료 후 목록에 `id_rsa` 표시 확인
+
+> ⚠️ 업로드 후 Pipeline permissions 설정 필요 (3단계 참고)
+
+---
+
+## 2. Variable Group 생성 — iwon-smart-ops-vg
+
+**경로:** ADO > Pipelines > Library > Variable groups > `+ Variable group`
+
+### 입력값
+
+| 변수명 | 값 | 비고 |
+|---|---|---|
+| `ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE` | `id_rsa` | Secure File 파일명 |
+| `AZURE_SERVICE_CONNECTION` | `iwon-smart-ops-sc` | Service Connection 이름 |
+| `TFSTATE_RG` | *(실제값 입력)* | Terraform 상태 저장 RG명 |
+| `TFSTATE_STORAGE` | *(실제값 입력)* | Terraform 상태 Storage 계정명 |
+
+### 주의사항
+- **Pipeline permissions** 탭 → `+` → `iwon-vm-cd` 파이프라인 추가 필수
+- 미설정 시 파이프라인 실행 시 Variable Group 접근 불가 에러 발생
+
+---
+
+## 3. Secure File Pipeline 권한 설정
+
+**경로:** ADO > Library > Secure files > `id_rsa` 클릭 > Pipeline permissions 탭
+
+1. `+` 버튼 클릭
+2. `iwon-vm-cd` 선택
+3. 목록에 `iwon-vm-cd` 표시 확인
+
+---
+
+## 4. Service Connection 권한 설정
+
+**경로:** ADO > Project Settings > Service connections > `iwon-smart-ops-sc` > Edit
+
+- **Security 섹션:** `Grant access permission to all pipelines` ☑ 체크
+- `Verify and save` 클릭 → `Verification Succeeded` 확인
+
+> ⚠️ 미체크 시 `azureSubscription references service connection which could not be found` 에러 발생
+
+---
+
+## 5. Pipeline YAML 수정 — azureSubscription 하드코딩
+
+**파일:** `gitops/ansible/azure-pipelines-vm.yml`
+
+### 변경 전 (에러 발생)
+```yaml
+azureSubscription: $(AZURE_SERVICE_CONNECTION)
+```
+
+### 변경 후 (정상 동작)
+```yaml
+azureSubscription: iwon-smart-ops-sc
+```
+
+**수정 위치 2곳:**
+1. `TerraformApply` job의 `AzureCLI@2` task
+2. `DeployByAnsible` job의 `AzureCLI@2` task
+
+> **원인:** Azure DevOps는 파이프라인 실행 전 validation 단계에서  
+> `azureSubscription` 값을 변수로 참조할 경우 resolve하지 못함 (알려진 제한)
+
+---
+
+## 6. Environments 생성
+
+**경로:** ADO > Pipelines > Environments > `Create environment`
+
+| Environment 이름 | 용도 | Resource |
+|---|---|---|
+| `iwon-gitops-infra` | Terraform Apply 스테이지 | None |
+| `iwon-gitops-app` | Artifact Download & VM Deploy 스테이지 | None |
+
+> 첫 파이프라인 실행 시 Permit 승인 필요 (아래 참고)
+
+---
+
+## 7. 파이프라인 첫 실행 — Authorize resources 승인
+
+### 실행 파라미터 (필수값)
+
+| 파라미터 | 값 |
+|---|---|
+| Run Terraform Apply | `false` (기본값) |
+| Ansible deploy target | `was` (기본값) |
+| Artifacts feed name | `iwon-smart-feed` |
+| Artifacts feed view (maven) | `Release` |
+| Maven package definition | `com.iteyes.smart:smart-was` |
+| Maven package version | `latest` |
+| Downloaded artifact filename pattern | `*.jar` |
+
+### 승인 절차
+1. `Run pipeline` → `Next: Resources` → `Run` 클릭
+2. Job 실행 후 노란 경고 배너 확인:  
+   `"This pipeline needs permission to access a resource..."`
+3. `View` 클릭 → Permission 다이얼로그에서 `Permit` 클릭
+4. `"Permit access?"` 확인 팝업 → `Permit` 클릭
+5. `iwon-gitops-app` Environment에 대한 영구 권한 부여 완료
+
+---
+
+## 8. 알려진 에러 및 해결 방법
+
+### ❌ azureSubscription 에러
+```
+The pipeline is not valid. Job TerraformApply: Step input azureSubscription 
+references service connection which could not be found.
+```
+**해결:** YAML에서 `$(AZURE_SERVICE_CONNECTION)` → `iwon-smart-ops-sc` 하드코딩
+
+---
+
+### ❌ No hosted parallelism 에러
+```
+No hosted parallelism has been purchased or granted.
+```
+**해결 방법 1 (무료, 2~3 영업일):** https://aka.ms/azpipelines-parallelism-request 신청  
+**해결 방법 2 (즉시):** Self-hosted Agent 구성 후 YAML 수정
+```yaml
+# 변경 전
+pool:
+  vmImage: ubuntu-latest
+
+# 변경 후
+pool:
+  name: <agent-pool-name>
+```
+
+---
+
+## 현재 구성 상태 요약
+
+| 항목 | 상태 |
+|---|---|
+| Secure File `id_rsa` | ✅ 업로드 완료 |
+| Variable Group `iwon-smart-ops-vg` | ✅ 생성 완료 (TFSTATE_RG/STORAGE 입력 필요) |
+| Service Connection `iwon-smart-ops-sc` | ✅ Verified, 전체 파이프라인 권한 허용 |
+| Environment `iwon-gitops-infra` | ✅ 생성 완료 |
+| Environment `iwon-gitops-app` | ✅ 생성 완료, Permit 완료 |
+| Pipeline YAML | ✅ azureSubscription 하드코딩 수정 완료 |
+| Hosted Parallelism | ❌ 미구성 → 신청 또는 Self-hosted Agent 필요 |
+```
+
+---
+
+**다음 작업 시** 버튼 클릭/입력 동작이 포함된 흐름에서 GIF를 자동 녹화하겠습니다. `TFSTATE_RG`, `TFSTATE_STORAGE` 값 입력이 준비되면 알려주세요!
+
+## 20) TFSTATE 미설정 시 PoC 임시 우회 반영
+
+사용자 선택에 따라 운영용 remote state 구성을 바로 도입하지 않고, `runTerraform=false` 기준 배포 검증이 가능하도록 임시 우회를 추가함.
+
+### 배경
+- 현재 `vm-azure`는 `provider.tf` 기준 remote backend(`backend "azurerm"`)가 아직 설정되지 않음
+- 따라서 Azure DevOps managed agent에서 `terraform output -json`을 실행하려면 `TFSTATE_RG`, `TFSTATE_STORAGE` 값이 필요하지만, 현재 Variable Group에 실값이 비어 있어 배포 단계가 중단됨
+
+### 우회 방식
+- 파일: `gitops/ansible/azure-pipelines-vm.yml`
+- 적용 대상: Deploy stage의 `runTerraform=false` 분기
+
+반영 내용:
+1. `TFSTATE_RG` 또는 `TFSTATE_STORAGE`가 비어 있으면 `AzureCLI@2` 단계에서 실패하지 않고 warning만 출력
+2. Terraform output JSON이 없을 경우 `vm-ansible/inventory.ini`를 정적 inventory fallback으로 사용
+3. fallback inventory 복사 후 `ansible_user`, `ansible_ssh_private_key_file` 값은 파이프라인 변수(`ANSIBLE_SSH_USER`, `ANSIBLE_SSH_KEY_PATH`)로 다시 맞춤
+
+### 기대 효과
+- PoC 단계에서 remote state 미구성 상태여도 `DownloadPackage -> Ansible deploy` 흐름 검증 가능
+- 기존 Terraform output 경로가 준비된 경우에는 기존 동작을 그대로 유지
+
+### 제한 사항
+- 이 우회는 `runTerraform=false` 배포 검증용 임시 조치임
+- 실제 운영 전환 시에는 반드시 Azure Storage remote backend를 구성하고 `TFSTATE_RG`, `TFSTATE_STORAGE`를 Variable Group에 실값으로 등록해야 함
+- `runTerraform=true` 경로는 여전히 backend 구성이 필요함
+
+### 현재 판정
+- PoC 임시 우회 YAML 반영 완료
+- 다음 파이프라인 실행에서는 TFSTATE 미설정으로 즉시 실패하지 않고 정적 inventory 기반으로 Ansible 배포 단계까지 진행 가능
