@@ -636,7 +636,7 @@ pool:
 | Environment `iwon-gitops-app` | ✅ 생성 완료, Permit 완료 |
 | Pipeline YAML | ✅ azureSubscription 하드코딩 수정 완료 |
 | Hosted Parallelism | ❌ 미구성 → 신청 또는 Self-hosted Agent 필요 |
-```
+
 
 ---
 

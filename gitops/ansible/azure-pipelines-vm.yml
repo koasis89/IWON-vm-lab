@@ -212,24 +212,8 @@ stages:
 
                       cp "${STATIC_INVENTORY_SOURCE}" "$(ANSIBLE_INVENTORY_OUT)"
 
-                      python3 - "$(ANSIBLE_INVENTORY_OUT)" "$(ANSIBLE_SSH_USER)" "$(ANSIBLE_SSH_KEY_PATH)" <<'PY'
-from pathlib import Path
-import sys
-
-inventory_path = Path(sys.argv[1])
-ssh_user = sys.argv[2]
-ssh_key_path = sys.argv[3]
-lines = inventory_path.read_text(encoding='utf-8').splitlines()
-updated = []
-for line in lines:
-    if line.startswith('ansible_user='):
-        updated.append(f'ansible_user={ssh_user}')
-    elif line.startswith('ansible_ssh_private_key_file='):
-        updated.append(f'ansible_ssh_private_key_file={ssh_key_path}')
-    else:
-        updated.append(line)
-inventory_path.write_text('\n'.join(updated) + '\n', encoding='utf-8')
-PY
+                        sed -i "s|^ansible_user=.*|ansible_user=$(ANSIBLE_SSH_USER)|" "$(ANSIBLE_INVENTORY_OUT)"
+                        sed -i "s|^ansible_ssh_private_key_file=.*|ansible_ssh_private_key_file=$(ANSIBLE_SSH_KEY_PATH)|" "$(ANSIBLE_INVENTORY_OUT)"
 
                       echo "##vso[task.logissue type=warning]Using static inventory fallback: $(STATIC_ANSIBLE_INVENTORY_PATH)"
                     else
