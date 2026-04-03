@@ -430,19 +430,23 @@ stages:
                       SRC_WSL="$(to_wsl_path "$(Build.SourcesDirectory)")"
                       INV_WSL="$(to_wsl_path "$(ANSIBLE_INVENTORY_OUT)")"
                       ART_WSL="$(to_wsl_path "$(TARGET_ARTIFACT)")"
-                      KEY_WSL="$(to_wsl_path "$HOME/.ssh/id_rsa")"
+                      KEY_SRC_WSL="$(to_wsl_path "$HOME/.ssh/id_rsa")"
+                      KEY_RUNTIME_WSL="~/.ssh/ado_id_rsa"
 
-                      sed -i "s|^ansible_ssh_private_key_file=.*|ansible_ssh_private_key_file=${KEY_WSL}|" "$(ANSIBLE_INVENTORY_OUT)" || true
+                      sed -i "s|^ansible_ssh_private_key_file=.*|ansible_ssh_private_key_file=${KEY_RUNTIME_WSL}|" "$(ANSIBLE_INVENTORY_OUT)" || true
 
                       wsl.exe bash -lc "
                         set -euo pipefail
                         export ANSIBLE_HOST_KEY_CHECKING=False
                         export ANSIBLE_CONFIG='${SRC_WSL}/$(ANSIBLE_CONFIG_PATH)'
+                        mkdir -p ~/.ssh
+                        cp '${KEY_SRC_WSL}' ~/.ssh/ado_id_rsa
+                        chmod 600 ~/.ssh/ado_id_rsa
                         ansible-playbook \
                           -i '${INV_WSL}' \
                           '${SRC_WSL}/$(ANSIBLE_PLAYBOOK_PATH)' \
                           --limit '${{ parameters.deployTarget }}' \
-                          --extra-vars 'deployTarget=${{ parameters.deployTarget }} target_artifact=${ART_WSL}'
+                          --extra-vars 'deployTarget=${{ parameters.deployTarget }} target_artifact=${ART_WSL} ansible_ssh_private_key_file=~/.ssh/ado_id_rsa'
                       "
                     else
                       export PATH="$PATH:/c/Users/koasi/AppData/Roaming/Python/Python311/Scripts:$HOME/.local/bin"
