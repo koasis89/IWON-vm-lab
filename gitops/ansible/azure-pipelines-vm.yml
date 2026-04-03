@@ -320,9 +320,16 @@ stages:
                     printf 'data=json.load(open(jp))\n' >> "${PYCHECK}"
                     printf 'pkgs=data.get("value",[])\n' >> "${PYCHECK}"
                     printf 'if not pkgs: print(f"##vso[task.logissue type=error]Package not found in feed. feed={fn} def={pd} ver={pv}. Publish the Maven artifact first, then re-run the deploy pipeline."); sys.exit(1)\n' >> "${PYCHECK}"
-                    printf 'if pv.lower()=="latest": print(f"Precheck passed: {pd} latest"); sys.exit(0)\n' >> "${PYCHECK}"
                     printf 'avail=[v.get("version") for p in pkgs for v in p.get("versions",[]) if v.get("version")]\n' >> "${PYCHECK}"
-                    printf 'if pv in avail: print(f"Precheck passed: {pd}=={pv}"); sys.exit(0)\n' >> "${PYCHECK}"
+                    printf 'latest=next((v.get("version") for p in pkgs for v in p.get("versions",[]) if v.get("isLatest")), None)\n' >> "${PYCHECK}"
+                    printf 'if pv.lower()=="latest":\n' >> "${PYCHECK}"
+                    printf '    resolved=latest or (sorted(set(avail), reverse=True)[0] if avail else "")\n' >> "${PYCHECK}"
+                    printf '    if not resolved: print(f"##vso[task.logissue type=error]Latest version could not be resolved. def={pd}"); sys.exit(1)\n' >> "${PYCHECK}"
+                    printf '    print(f"##vso[task.setvariable variable=RESOLVED_MAVEN_VERSION]{resolved}")\n' >> "${PYCHECK}"
+                    printf '    print(f"Precheck passed: {pd} latest -> {resolved}"); sys.exit(0)\n' >> "${PYCHECK}"
+                    printf 'if pv in avail:\n' >> "${PYCHECK}"
+                    printf '    print(f"##vso[task.setvariable variable=RESOLVED_MAVEN_VERSION]{pv}")\n' >> "${PYCHECK}"
+                    printf '    print(f"Precheck passed: {pd}=={pv}"); sys.exit(0)\n' >> "${PYCHECK}"
                     printf 'samp=", ".join(sorted(set(avail),reverse=True)[:10])\n' >> "${PYCHECK}"
                     printf 'print(f"##vso[task.logissue type=error]Version not found. def={pd} req={pv} avail={samp}"); sys.exit(1)\n' >> "${PYCHECK}"
                     python "${PYCHECK}" "${TMP_JSON}" "${PKG_DEF}" "${PKG_VERSION}" "${FEED_NAME}" "${FEED_VIEW}"
@@ -335,15 +342,53 @@ stages:
                     FEED_VIEW: ${{ parameters.artifactFeedView }}
                     SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
-                - task: DownloadPackage@1
+                - bash: |
+                    set -euo pipefail
+
+                    if [ -z "${SYSTEM_ACCESSTOKEN:-}" ]; then
+                      echo "##vso[task.logissue type=error]SYSTEM_ACCESSTOKEN is empty. Enable OAuth token access for scripts in this pipeline/job."
+                      exit 1
+                    fi
+
+                    ORG_URL="${SYSTEM_COLLECTIONURI%/}"
+                    ORG_NAME="${ORG_URL##*/}"
+                    PROJECT_SEGMENT="${SYSTEM_TEAMPROJECTID:-${SYSTEM_TEAMPROJECT:-}}"
+                    PKG_VERSION="${RESOLVED_MAVEN_VERSION:-${REQUESTED_VERSION}}"
+
+                    GROUP_ID="${PKG_DEF%%:*}"
+                    ARTIFACT_ID="${PKG_DEF##*:}"
+                    GROUP_PATH="${GROUP_ID//./\/}"
+
+                    FILE_EXT="jar"
+                    case "${PATTERN}" in
+                      *.zip|*zip) FILE_EXT="zip" ;;
+                      *.war|*war) FILE_EXT="war" ;;
+                    esac
+
+                    ARTIFACT_URL="https://pkgs.dev.azure.com/${ORG_NAME}/${PROJECT_SEGMENT}/_packaging/${FEED_NAME}/maven/v1/${GROUP_PATH}/${ARTIFACT_ID}/${PKG_VERSION}/${ARTIFACT_ID}-${PKG_VERSION}.${FILE_EXT}"
+                    TARGET_PATH="$(System.ArtifactsDirectory)/${ARTIFACT_ID}-${PKG_VERSION}.${FILE_EXT}"
+                    mkdir -p "$(System.ArtifactsDirectory)"
+
+                    HTTP_CODE="$(curl -sS -L -o "${TARGET_PATH}" -w "%{http_code}" -H "Authorization: Bearer ${SYSTEM_ACCESSTOKEN}" "${ARTIFACT_URL}")"
+                    if [ "${HTTP_CODE}" = "401" ] || [ "${HTTP_CODE}" = "403" ]; then
+                      HTTP_CODE="$(curl -sS -L -u ":${SYSTEM_ACCESSTOKEN}" -o "${TARGET_PATH}" -w "%{http_code}" "${ARTIFACT_URL}")"
+                    fi
+
+                    if [ "${HTTP_CODE}" != "200" ]; then
+                      echo "##vso[task.logissue type=error]Artifact download failed with HTTP ${HTTP_CODE}. url=${ARTIFACT_URL}"
+                      exit 1
+                    fi
+
+                    echo "Downloaded artifact: ${TARGET_PATH}"
                   displayName: Download artifact from Maven feed
-                  inputs:
-                    packageType: maven
-                    feed: ${{ parameters.artifactFeedName }}
-                    view: ${{ parameters.artifactFeedView }}
-                    definition: $(EFFECTIVE_MAVEN_DEF)
-                    version: ${{ parameters.mavenPackageVersion }}
-                    downloadPath: $(System.ArtifactsDirectory)
+                  env:
+                    PATH: $(GIT_BASH_DIR);$(PATH)
+                    PKG_DEF: $(EFFECTIVE_MAVEN_DEF)
+                    FEED_NAME: ${{ parameters.artifactFeedName }}
+                    REQUESTED_VERSION: ${{ parameters.mavenPackageVersion }}
+                    PATTERN: $(EFFECTIVE_ARTIFACT_PATTERN)
+                    RESOLVED_MAVEN_VERSION: $(RESOLVED_MAVEN_VERSION)
+                    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
                 - bash: |
                     set -euo pipefail
