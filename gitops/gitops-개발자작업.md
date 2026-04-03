@@ -213,6 +213,19 @@
 
 ---
 
-## 8. 다음 단계
+## 8. GitHub Actions workflow 초안 파일
 
-원하면 다음 단계로 **각 저장소별 GitHub Actions workflow 초안**(`deploy-web.yml`, `deploy-was.yml`, `deploy-app.yml`, `deploy-integration.yml`)까지 바로 맞춰서 이어서 작성할 수 있다.
+바로 복사해 사용할 수 있는 초안 파일은 아래 경로에 정리했다.
+
+- `gitops/workflow-templates/deploy-web.yml`
+- `gitops/workflow-templates/deploy-was.yml`
+- `gitops/workflow-templates/deploy-app.yml`
+- `gitops/workflow-templates/deploy-integration.yml`
+- `gitops/workflow-templates/README.md`
+
+사용 방법:
+1. 각 파일을 대상 저장소의 `.github/workflows/` 로 복사
+2. 실제 모듈 경로/빌드 명령(`gradlew`, `npm build` 등)에 맞게 한 번 조정
+3. GitHub Secrets 등록 후 `main` 또는 `workflow_dispatch` 로 검증
+
+다음 단계가 필요하면 이 초안을 기준으로 **저장소별 실제 workflow 형태로 바로 구체화**하면 된다.
