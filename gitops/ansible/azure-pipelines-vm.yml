@@ -289,10 +289,16 @@ stages:
 
                     ORG_URL="${SYSTEM_COLLECTIONURI%/}"
                     ORG_NAME="${ORG_URL##*/}"
+                    PROJECT_SEGMENT="${SYSTEM_TEAMPROJECTID:-${SYSTEM_TEAMPROJECT:-}}"
+
+                    if [ -z "${PROJECT_SEGMENT}" ]; then
+                      echo "##vso[task.logissue type=error]SYSTEM_TEAMPROJECT/SYSTEM_TEAMPROJECTID is empty, so the Azure Artifacts project-scoped feed URL cannot be resolved."
+                      exit 1
+                    fi
 
                     ENCODED_DEF="$(python -c "import os,urllib.parse; print(urllib.parse.quote(os.environ['PKG_DEF'], safe=''))")"
 
-                    API_URL="https://feeds.dev.azure.com/${ORG_NAME}/_apis/Packaging/Feeds/${FEED_NAME}/Packages?packageNameQuery=${ENCODED_DEF}&protocolType=maven&includeAllVersions=true&api-version=7.1-preview.1"
+                    API_URL="https://feeds.dev.azure.com/${ORG_NAME}/${PROJECT_SEGMENT}/_apis/Packaging/Feeds/${FEED_NAME}/Packages?packageNameQuery=${ENCODED_DEF}&protocolType=maven&includeAllVersions=true&api-version=7.1-preview.1"
                     TMP_JSON="$(mktemp)"
 
                     HTTP_CODE="$(curl -sS -o "${TMP_JSON}" -w "%{http_code}" -H "Authorization: Bearer ${SYSTEM_ACCESSTOKEN}" "${API_URL}")"
@@ -313,7 +319,7 @@ stages:
                     printf 'jp,pd,pv,fn,fv=sys.argv[1:]\n' >> "${PYCHECK}"
                     printf 'data=json.load(open(jp))\n' >> "${PYCHECK}"
                     printf 'pkgs=data.get("value",[])\n' >> "${PYCHECK}"
-                    printf 'if not pkgs: print(f"##vso[task.logissue type=error]Package not found. feed={fn} def={pd} ver={pv}"); sys.exit(1)\n' >> "${PYCHECK}"
+                    printf 'if not pkgs: print(f"##vso[task.logissue type=error]Package not found in feed. feed={fn} def={pd} ver={pv}. Publish the Maven artifact first, then re-run the deploy pipeline."); sys.exit(1)\n' >> "${PYCHECK}"
                     printf 'if pv.lower()=="latest": print(f"Precheck passed: {pd} latest"); sys.exit(0)\n' >> "${PYCHECK}"
                     printf 'avail=[v.get("version") for p in pkgs for v in p.get("versions",[]) if v.get("version")]\n' >> "${PYCHECK}"
                     printf 'if pv in avail: print(f"Precheck passed: {pd}=={pv}"); sys.exit(0)\n' >> "${PYCHECK}"
