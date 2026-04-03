@@ -253,7 +253,7 @@ ARM 값 확보 절차/명령은 IaC 실행 단계인 1.1.1에서 수행한다.
 역주입 작업:
 - GitHub 각 저장소에 `ADO_PIPELINE_ID` 등록
 
-### 2.5 변수/시크릿/Secure File 점검
+### 2.5 변수/시크릿/Secure File/Feed 권한 점검
 
 1. Pipeline 변수 점검
 - `AZURE_SERVICE_CONNECTION`
@@ -262,13 +262,22 @@ ARM 값 확보 절차/명령은 IaC 실행 단계인 1.1.1에서 수행한다.
 - `ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE`
 
 2. Library/Variable Group(`iwon-smart-ops-vg`) 사용 시 연결 여부 확인
-	- 권장 변수 추가:
-	  - `ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE = id_rsa`
-1ㅂ	ㅂ	ㅂ		ㅂ	`1	11ㅂ1	1````````````````````````ㅂㅂㅁㅁㅂ	ㅂㄴㄴㄴㄴㄴㅋㅋㅁㄴㄵㅂ			11	````````````````111``ㅂㅂ11	  - `TFSTATE_RG = <backend-rg>`
-	  - `TFSTATE_STORAGE = <backend-storage-account>`
+- 권장 변수:
+  - `ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE = id_rsa`
+  - `TFSTATE_RG = <backend-rg>`
+  - `TFSTATE_STORAGE = <backend-storage-account>`
+
 3. Secure Files에 SSH 키 등록
-	- 파일명은 `id_rsa`로 업로드(파이프라인 기본값과 동일)
-	- 파이프라인의 `InstallSSHKey@0`는 `sshKeySecureFile: $(ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE)`를 사용
+- 파일명은 `id_rsa`로 업로드(파이프라인 기본값과 동일)
+- 파이프라인의 `InstallSSHKey@0`는 `sshKeySecureFile: $(ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE)`를 사용
+
+4. Azure Artifacts Feed 점검
+- Feed 이름: `iwon-smart-feed`
+- Project: `iwon-smart-ops`
+- 점검 항목:
+  - Feed 자체가 존재하는지
+  - 파이프라인/Build Service 계정에 Reader 이상 권한이 있는지
+  - 실제 패키지(`smart-web`, `smart-was`, `smart-app`, `smart-integration`)가 publish 되었는지
 
 주의:
 1. `AzureCLI@2`의 `azureSubscription` 입력은 실행 전 validation 단계에서 해석되므로 변수(`$(AZURE_SERVICE_CONNECTION)`) 대신 실제 Service Connection 이름을 직접 사용한다.
@@ -277,12 +286,72 @@ ARM 값 확보 절차/명령은 IaC 실행 단계인 1.1.1에서 수행한다.
 정상 등록 방법:
 1. Azure DevOps 포털 > Pipelines > Library > Secure files 에 `id_rsa` 업로드
 2. 파이프라인 변수 `ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE` 값을 `id_rsa`로 설정
-3. 첫 실행 시 리소스 권한 Authorize
-4. 재실행 후 `InstallSSHKey` 단계 통과 확인
+3. Feed > Permissions 에서 `iwon-smart-ops Build Service (iteyes-ito)` 또는 동등 Build Service 그룹에 Reader 이상 권한 부여
+4. 첫 실행 시 리소스 권한 Authorize
+5. 재실행 후 `InstallSSHKey` 및 Feed precheck 단계 통과 확인
 
 검증 기준:
 - Pipeline 편집 화면에서 변수 참조 오류 없음
 - 권한(Authorize resources) 완료
+- Feed 목록과 패키지 목록 조회 가능
+
+### 2.6 현재 상태 스냅샷 (2026-04-03 기준)
+
+| 항목 | 현재 상태 | 구분 | 메모 |
+|---|---|---|---|
+| Organization `iteyes-ito` | 완료 | ADO Portal | 접근 가능 |
+| Project `iwon-smart-ops` | 완료 | ADO Portal | 접근 가능 |
+| Pipeline `iwon-vm-cd` (ID=`2`) | 완료 | ADO Portal | 수동 큐잉 및 실행 확인 |
+| Feed `iwon-smart-feed` 생성 | 완료 | ADO Portal | Feed 존재 확인 |
+| Feed 권한(403 해소) | 완료 | ADO Portal | Build Service 권한 반영 후 403 해소 |
+| Secure File `id_rsa` / SSH key 설정 | 완료 | ADO Portal | `InstallSSHKey` 단계 통과 확인 |
+| Self-hosted agent `Default/JASONK` | 완료(가동 필요) | ADO Portal/Agent | offline 이면 run 이 pending 상태로 멈춤 |
+| `IWON-vm-lab`의 CD YAML/Ansible | 완료 | gitops 저장소 | 배포 엔진 역할 |
+| GitHub source repo의 `build.gradle` | 미확정/미착수 | GitHub source repo | `IWON-vm-lab`에는 원래 없음 |
+| GitHub Actions workflow 배치 | 미확정/미착수 | GitHub source repo | `IWonPaymentWeb/App/Integration`에서 수행 |
+| GitHub Secrets (`ADO_PAT`, `ADO_PIPELINE_ID`) | 미확정/미착수 | GitHub source repo | source repo별 등록 필요 |
+| Feed 내 실제 패키지 publish | 미완료 | GitHub source repo → Feed | 현재 `smart-was` 미게시 상태 |
+
+판단 포인트:
+- **ADO Portal 설정 문제는 대부분 해소된 상태**다.
+- **현재 주 차단 원인은 GitHub source repo 쪽 CI/publish 미구성 또는 미실행**이다.
+
+### 2.7 문제 발생 시 원인 구분표
+
+| 증상/로그 | 원인 분류 | 먼저 볼 위치 | 해석 |
+|---|---|---|---|
+| `Input required: hostName` | ADO Pipeline 설정 문제 | `azure-pipelines-vm.yml`, Secure File | SSH task 입력 누락 |
+| `HTTP 403` on feed | ADO Portal 권한 문제 | Feed > Permissions | Build Service feed 권한 부족 |
+| `Package not found in feed` | GitHub 사전 설정/CI 미완료 | source repo `build.gradle`, Actions, Feed package 목록 | 패키지가 아직 publish 안 됨 |
+| run 이 `pending` 에서 멈춤 | ADO Agent 문제 | Agent Pool > `Default` > `JASONK` | self-hosted agent offline |
+| `No commit found for SHA` | 실행 파라미터 문제 | Run pipeline 입력값 / REST payload | 잘못된 ref 또는 SHA 전달 |
+| `IWON-vm-lab`에 `build.gradle` 없음 | 정상 구조 | 저장소 역할 구분 | 이 저장소는 gitops/CD 저장소임 |
+
+### 2.8 다음 판단 순서 (현재 기준)
+
+1. **배포 대상을 1개만 먼저 확정** (`web` 또는 `was` 권장)
+2. 해당 **실제 source 저장소**에서 `build.gradle` / `maven-publish` / GitHub Actions를 점검
+3. `iwon-smart-feed` 에 패키지를 1회 publish
+4. 그 후 ADO Pipeline을 다시 실행해 VM 배포 단계까지 확인
+
+### 2.9 확정된 PoC 기준값 (`iwon-poc` 기준)
+
+| 항목 | 확정 값 |
+|---|---|
+| 로컬 소스 경로 | `C:\Workspace\iwon-poc\iwon-poc` |
+| GitHub 저장소 | `https://github.com/ITeyes-IWon/iwon-poc.git` |
+| PoC artifact 좌표 | `com.iteyes.smart:iwon-poc` |
+| `build.gradle` jar 이름 | `archiveBaseName = 'iwon-poc'` |
+| Azure DevOps `deployTarget` | `was` |
+| 실제 배포 대상 VM | `was01` |
+| Artifact 패턴 | `*.jar` |
+| Feed | `iwon-smart-feed` |
+
+PoC 진행 원칙:
+1. **기존 운영 저장소(`IWonPaymentWeb/App/Integration`)는 당장 수정하지 않는다.**
+2. **독립 저장소 `iwon-poc`에서 build/publish/deploy 체인을 먼저 검증한다.**
+3. ADO 파이프라인은 `deployTarget=was` 로 호출하되, 패키지는 `com.iteyes.smart:iwon-poc` 를 사용한다.
+4. 검증이 끝난 후 운영 저장소에 동일 패턴을 이식한다.
 
 ---
 

@@ -14,8 +14,20 @@ variable "admin_username" {
 }
 
 variable "admin_password" {
-  description = "The password to use for the VMs"
-  default     = "<CHANGE_ME_ADMIN_PASSWORD>"
+  description = "Optional VM admin password. Leave null to use SSH-key-only authentication. If set, it must satisfy Azure complexity rules."
+  type        = string
+  default     = null
+  sensitive   = true
+
+  validation {
+    condition = var.admin_password == null || (
+      length(regexall("[a-z]", var.admin_password)) > 0 &&
+      length(regexall("[A-Z]", var.admin_password)) > 0 &&
+      length(regexall("[0-9]", var.admin_password)) > 0 &&
+      length(regexall("[^A-Za-z0-9_]", var.admin_password)) > 0
+    )
+    error_message = "admin_password must include lowercase, uppercase, digit, and special character other than underscore, or be null for SSH-only authentication."
+  }
 }
 
 variable "ssh_public_key_path" {

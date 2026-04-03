@@ -265,6 +265,52 @@ flowchart LR
   - 월 1회 취약점 스캔
   - 분기 1회 복구 리허설
 
+### 4.6 VM Terraform 작성 기준: `admin_password` 형식 오류 예방
+
+**Azure Linux VM용 Terraform 작성 시 비밀번호 형식 오류를 사전에 예방하기 위한 기준**이다.
+
+기본 원칙:
+- 가능하면 `admin_password`를 사용하지 않고 **SSH 키 기반 인증을 기본값**으로 한다.
+- 비밀번호 인증이 꼭 필요한 경우에만 `admin_password`를 명시한다.
+- `admin_password`를 사용할 때는 Azure VM 복잡도 정책을 만족하는 값을 사용한다.
+
+권장 작성 방식:
+1. `variables.tf`에서 `admin_password`는 기본값을 하드코딩하지 말고 `null` 허용으로 선언한다.
+2. `compute.tf`에서는 `disable_password_authentication = var.admin_password == null` 형태로 작성해, 비밀번호가 없으면 자동으로 SSH 전용 모드가 되도록 한다.
+3. 운영 저장소에는 실제 비밀번호 문자열을 직접 커밋하지 않는다.
+
+예시:
+
+```hcl
+variable "admin_password" {
+  description = "Optional VM admin password. Leave null to use SSH-key-only authentication."
+  type        = string
+  default     = null
+  sensitive   = true
+}
+```
+
+```hcl
+resource "azurerm_linux_virtual_machine" "vm" {
+  admin_password                  = var.admin_password
+  disable_password_authentication = var.admin_password == null
+}
+```
+
+비밀번호를 직접 지정해야 할 때 체크할 항목:
+- 소문자 포함
+- 대문자 포함
+- 숫자 포함
+- 특수문자 포함 (`_` 제외 권장)
+- 팀 정책상 충분한 길이 사용
+
+권장 운영 방식:
+- 운영/검증 환경 모두 SSH 키 기반 인증을 우선 적용
+- 예외적으로 비밀번호 인증이 필요하면 `terraform.tfvars` 또는 환경변수로 주입
+- 실제 비밀번호는 Key Vault, Secret Store, Pipeline Secret Variable 등 외부 비밀 저장소로 관리
+
+이 기준을 따르면 `admin_password` 복잡도 오류로 인해 `terraform plan` 또는 `terraform apply`가 중단되는 상황을 예방할 수 있다.
+
 ## 5. Key Vault 연동 기준
 
 이 절은 현재 VM 직접 구성에서 인증서/비밀 관리를 Azure Key Vault로 표준화하기 위한 필수 추가 항목입니다.

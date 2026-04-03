@@ -68,6 +68,7 @@ resource "azurerm_storage_account_network_rules" "nfs" {
   storage_account_id = azurerm_storage_account.nfs.id
   default_action     = "Deny"
   bypass             = ["AzureServices"]
+  ip_rules           = [for cidr in local.trusted_admin_cidrs : trimsuffix(cidr, "/32")]
 
   depends_on = [
     azurerm_private_endpoint.storage_files

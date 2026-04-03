@@ -42,7 +42,9 @@
 - time provider 버전: ~> 0.12
 - Resource Group 생성
 - 공통 태그 정의(env=poc, owner=platform-team 등)
-- trusted_admin_cidr 고정: 175.197.170.13/32
+- trusted_admin_cidrs 고정:
+  - 175.197.170.13/32
+  - 220.118.151.107/32
 - Subnet CIDR 고정:
   - ingress: 10.0.1.0/24
   - app: 10.0.2.0/24
@@ -50,7 +52,7 @@
   - fw: 10.0.254.0/26
 
 검토 포인트:
-- 관리자 공인 IP 변경 시 trusted_admin_cidr 업데이트가 필요
+- 관리자 공인 IP 변경 시 trusted_admin_cidrs 업데이트가 필요
 - 로컬 변수 기반 CIDR이라 환경별 분리(dev/stg/prod)가 아직 없음
 
 ### 2.2 변수 구조

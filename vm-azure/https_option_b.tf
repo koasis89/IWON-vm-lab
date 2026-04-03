@@ -113,7 +113,7 @@ resource "azurerm_application_gateway" "https" {
 
   lifecycle {
     precondition {
-      condition = local.use_imported_tls_certificate ? length(trimspace(local.imported_tls_certificate_secret_id)) > 0 : true
+      condition     = local.use_imported_tls_certificate ? length(trimspace(local.imported_tls_certificate_secret_id)) > 0 : true
       error_message = "When tls_certificate_mode is 'import', tls_certificate_existing_secret_id (or the derived versionless secret ID) must not be empty."
     }
   }

@@ -11,7 +11,10 @@ locals {
     service    = "iwon-svc"
   }
 
-  trusted_admin_cidr = "175.197.170.13/32"
+  trusted_admin_cidrs = [
+    "175.197.170.13/32",
+    "220.118.151.107/32",
+  ]
 
   subnet_cidrs = {
     ingress = "10.0.1.0/24"

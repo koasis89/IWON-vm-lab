@@ -218,7 +218,7 @@ resource "azurerm_network_security_rule" "mgmt_ssh" {
   protocol                    = "Tcp"
   source_port_range           = "*"
   destination_port_range      = "22"
-  source_address_prefix       = local.trusted_admin_cidr
+  source_address_prefixes     = local.trusted_admin_cidrs
   destination_address_prefix  = "*"
   resource_group_name         = azurerm_resource_group.this.name
   network_security_group_name = azurerm_network_security_group.mgmt.name

@@ -77,6 +77,26 @@ flowchart TD
   class P,O controlNode
 ```
 
+### 1.1.1 현재 진행 위치 (2026-04-03 기준)
+
+현재는 **1.1 흐름도 기준으로 `C(Feed)` ~ `E(Azure DevOps Pipeline)` 사이를 검증한 상태**입니다.  
+즉, ADO 배포 엔진은 대부분 살아 있으나, **GitHub source repo에서 Feed로 publish 되는 선행 단계가 아직 완성되지 않아 `B -> C` 연결이 비어 있는 상태**입니다.
+
+| 흐름 단계 | 현재 상태 | 소관 영역 | 판단 |
+|---|---|---|---|
+| 1. 개발자 GitHub Repository | 미확정/미착수 | GitHub source repo | `build.gradle`, workflow, secrets 확인 필요 |
+| 2. GitHub Actions build/publish | 미완료 | GitHub source repo | 아직 실제 패키지 publish 확인 안 됨 |
+| 3. Azure Artifacts Feed | 부분완료 | Azure DevOps Portal | Feed 존재/권한 확인 완료, 패키지는 비어 있음 |
+| 4. gitops Repository | 완료 | `IWON-vm-lab` | YAML/Ansible/Terraform 보유 |
+| 5. Azure DevOps Pipeline | 부분완료 | Azure DevOps Portal + gitops repo | run/queue/SSH/precheck 검증 완료 |
+| 6. Target VM 배포 | 미도달 | VM/Ansible | artifact 미게시로 아직 도달 못함 |
+
+### 1.1.2 저장소 역할 혼동 방지 메모
+
+- `IWON-vm-lab`은 **gitops/CD 저장소**다. 따라서 여기에 `build.gradle`이 없는 것은 정상이다.
+- `IWonPaymentWeb`, `IWonPaymentApp`, `IWonPaymentIntegration`은 **소스/CI 저장소**다. `build.gradle`, GitHub Actions, 패키지 publish 설정은 이 저장소들에서 작업해야 한다.
+- 따라서 `Package not found in feed` 류 이슈는 보통 **ADO Portal 자체 문제라기보다 source repo의 build/publish 미완료**에서 발생한다.
+
 ### 1.2 저장소 역할 분담
 
 1. 개발자 리포지토리
@@ -108,6 +128,9 @@ flowchart TD
 
 - Cloud Build 방식: 개발자의 로컬(VS Code) 환경이 아닌 GitHub Runner에서 빌드를 수행합니다.
 - 이유: 환경 일관성 유지(Java 버전 통일), 로컬 설정 유입 차단, 휴먼 에러 방지.
+
+> 현재 1차 PoC는 운영 저장소를 직접 수정하지 않고, 별도 저장소 `iwon-poc` (`C:\Workspace\iwon-poc\iwon-poc`, `https://github.com/ITeyes-IWon/iwon-poc.git`) 기준으로 진행합니다.  
+> 이 PoC의 고정값은 `artifactId/archiveBaseName = iwon-poc`, `deployTarget = was`, 대상 VM = `was01` 입니다.
 
 ### 2.2 Gradle 설정 (build.gradle)
 

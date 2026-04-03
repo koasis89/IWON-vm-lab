@@ -24,18 +24,25 @@ resource "azurerm_network_interface" "vm" {
 }
 
 resource "azurerm_linux_virtual_machine" "vm" {
-  for_each            = var.vm_definitions
-  name                = each.value.name
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
-  size                = each.value.size
-  admin_username      = var.admin_username
-  admin_password      = var.admin_password
-  disable_password_authentication = false
-  network_interface_ids = [azurerm_network_interface.vm[each.key].id]
+  for_each                        = var.vm_definitions
+  name                            = each.value.name
+  location                        = azurerm_resource_group.this.location
+  resource_group_name             = azurerm_resource_group.this.name
+  size                            = each.value.size
+  admin_username                  = var.admin_username
+  admin_password                  = var.admin_password
+  disable_password_authentication = var.admin_password == null
+  network_interface_ids           = [azurerm_network_interface.vm[each.key].id]
   tags = merge(local.tags, {
     role = each.value.name
   })
+
+  lifecycle {
+    ignore_changes = [
+      admin_password,
+      disable_password_authentication,
+    ]
+  }
 
   admin_ssh_key {
     username   = var.admin_username
