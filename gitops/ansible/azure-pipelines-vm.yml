@@ -409,15 +409,41 @@ stages:
 
                 - bash: |
                     set -euo pipefail
-                    export PATH="$PATH:/c/Users/koasi/AppData/Roaming/Python/Python311/Scripts:$HOME/.local/bin"
                     export ANSIBLE_HOST_KEY_CHECKING=False
-                    export ANSIBLE_CONFIG="$(Build.SourcesDirectory)/$(ANSIBLE_CONFIG_PATH)"
 
-                    ansible-playbook \
-                      -i "$(ANSIBLE_INVENTORY_OUT)" \
-                      "$(Build.SourcesDirectory)/$(ANSIBLE_PLAYBOOK_PATH)" \
-                      --limit "${{ parameters.deployTarget }}" \
-                      --extra-vars "deployTarget=${{ parameters.deployTarget }} target_artifact=$(TARGET_ARTIFACT)"
+                    if command -v wsl.exe >/dev/null 2>&1; then
+                      SRC_WIN="$(cygpath -w "$(Build.SourcesDirectory)")"
+                      INV_WIN="$(cygpath -w "$(ANSIBLE_INVENTORY_OUT)")"
+                      ART_WIN="$(cygpath -w "$(TARGET_ARTIFACT)")"
+                      KEY_WIN="${USERPROFILE}\\.ssh\\id_rsa"
+
+                      SRC_WSL="$(wsl.exe wslpath -a "$SRC_WIN")"
+                      INV_WSL="$(wsl.exe wslpath -a "$INV_WIN")"
+                      ART_WSL="$(wsl.exe wslpath -a "$ART_WIN")"
+                      KEY_WSL="$(wsl.exe wslpath -a "$KEY_WIN")"
+
+                      sed -i "s|^ansible_ssh_private_key_file=.*|ansible_ssh_private_key_file=${KEY_WSL}|" "$(ANSIBLE_INVENTORY_OUT)" || true
+
+                      wsl.exe bash -lc "
+                        set -euo pipefail
+                        export ANSIBLE_HOST_KEY_CHECKING=False
+                        export ANSIBLE_CONFIG='${SRC_WSL}/$(ANSIBLE_CONFIG_PATH)'
+                        ansible-playbook \
+                          -i '${INV_WSL}' \
+                          '${SRC_WSL}/$(ANSIBLE_PLAYBOOK_PATH)' \
+                          --limit '${{ parameters.deployTarget }}' \
+                          --extra-vars 'deployTarget=${{ parameters.deployTarget }} target_artifact=${ART_WSL}'
+                      "
+                    else
+                      export PATH="$PATH:/c/Users/koasi/AppData/Roaming/Python/Python311/Scripts:$HOME/.local/bin"
+                      export ANSIBLE_CONFIG="$(Build.SourcesDirectory)/$(ANSIBLE_CONFIG_PATH)"
+
+                      ansible-playbook \
+                        -i "$(ANSIBLE_INVENTORY_OUT)" \
+                        "$(Build.SourcesDirectory)/$(ANSIBLE_PLAYBOOK_PATH)" \
+                        --limit "${{ parameters.deployTarget }}" \
+                        --extra-vars "deployTarget=${{ parameters.deployTarget }} target_artifact=$(TARGET_ARTIFACT)"
+                    fi
                   displayName: Run Ansible deploy playbook
                   env:
                     PATH: $(GIT_BASH_DIR);$(PATH)
