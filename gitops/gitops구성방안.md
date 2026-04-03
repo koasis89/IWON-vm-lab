@@ -120,6 +120,27 @@ flowchart TD
   - gitops/ansible/tasks/deploy-app.yml
   - gitops/ansible/tasks/deploy-integration.yml
 
+### 1.3 web/was/app/integration 타깃 맵
+
+`gitops`는 이미 4개 배포 타깃 기준으로 구성되어 있으며, Azure DevOps의 `deployTarget` 값으로 분기된다.
+
+| 타깃 | `deployTarget` | 배포 task | 역할 | 원격 반영 위치 |
+|---|---|---|---|---|
+| Web | `web` | `gitops/ansible/tasks/deploy-web.yml` | 정적 파일 + nginx | web01 / nginx |
+| WAS | `was` | `gitops/ansible/tasks/deploy-was.yml` | Spring Boot JAR | was01 / `was.service` |
+| App | `app` | `gitops/ansible/tasks/deploy-app.yml` | Spring Boot JAR | app01 / `app.service` |
+| Integration | `integration` | `gitops/ansible/tasks/deploy-integration.yml` | JAR + Kafka 변수 | smartcontract01 / `integration.service` |
+
+### 1.4 개발자 관점 안전 원칙
+
+- 소스 저장소는 **빌드와 버전 관리**, `gitops` 저장소는 **배포 정의 관리**만 맡는다.
+- PoC 산출물은 운영 공용 서비스명(`was.service` 등)에 바로 투입하지 않는다.
+- 배포 전에는 항상 아래 3가지를 명시한다.
+  1. `deployTarget`
+  2. `mavenPackageDefinition`
+  3. `mavenPackageVersion`
+- 운영 배포는 `main` 직접 실험 대신 **검증 브랜치 → 승인 → 반영** 순서로 진행한다.
+
 ---
 
 ## 2. GitHub CI 설정 (소스 빌드 및 Artifact 발행)
