@@ -412,15 +412,19 @@ stages:
                     export ANSIBLE_HOST_KEY_CHECKING=False
 
                     if command -v wsl.exe >/dev/null 2>&1; then
-                      SRC_WIN="$(cygpath -w "$(Build.SourcesDirectory)")"
-                      INV_WIN="$(cygpath -w "$(ANSIBLE_INVENTORY_OUT)")"
-                      ART_WIN="$(cygpath -w "$(TARGET_ARTIFACT)")"
-                      KEY_WIN="${USERPROFILE}\\.ssh\\id_rsa"
+                      to_wsl_path() {
+                        local input="$1"
+                        if [[ "$input" =~ ^/([a-zA-Z])/(.*)$ ]]; then
+                          printf '/mnt/%s/%s' "$(printf '%s' "${BASH_REMATCH[1]}" | tr '[:upper:]' '[:lower:]')" "${BASH_REMATCH[2]}"
+                        else
+                          printf '%s' "$input"
+                        fi
+                      }
 
-                      SRC_WSL="$(wsl.exe wslpath -a "$SRC_WIN")"
-                      INV_WSL="$(wsl.exe wslpath -a "$INV_WIN")"
-                      ART_WSL="$(wsl.exe wslpath -a "$ART_WIN")"
-                      KEY_WSL="$(wsl.exe wslpath -a "$KEY_WIN")"
+                      SRC_WSL="$(to_wsl_path "$(Build.SourcesDirectory)")"
+                      INV_WSL="$(to_wsl_path "$(ANSIBLE_INVENTORY_OUT)")"
+                      ART_WSL="$(to_wsl_path "$(TARGET_ARTIFACT)")"
+                      KEY_WSL="$(to_wsl_path "$HOME/.ssh/id_rsa")"
 
                       sed -i "s|^ansible_ssh_private_key_file=.*|ansible_ssh_private_key_file=${KEY_WSL}|" "$(ANSIBLE_INVENTORY_OUT)" || true
 
