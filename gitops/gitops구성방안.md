@@ -23,6 +23,71 @@
 - GitHub(CI): IWonPaymentWeb 저장소의 web/was 폴더, IWonPaymentApp 저장소, IWonPaymentIntegration 저장소에서 소스를 빌드하고 결과물(JAR/Zip)을 Azure Artifacts로 업로드합니다.
 - Azure DevOps(CD): 파이프라인을 인프라(Terraform)와 애플리케이션(Ansible) 단계로 분리해 실행합니다.
 
+### 1.0 Git Ops 개념도
+
+아래 개념도는 **개발자PC → GitHub Repo → GitHub Actions → GitHub 퍼블리싱 VM → Azure DevOps(Project / Pipeline / Artifacts) → bastion VM(self-hosted ADO agent) → 대상 VM** 간의 구성 관계를 보여준다.
+
+```mermaid
+flowchart TD
+  subgraph DEV[개발자]
+    A[개발자 PC<br/>소스 수정 / commit / push]
+  end
+  
+  subgraph ARCHITECT[운영, 배포 아키텍트]
+    CA[아키텍트 PC<br/>gitops 변경 / git commit / push]
+  end
+
+  subgraph GH[GitHub 영역]
+    direction LR
+    B[GitHub Repo<br/>IWonPaymentWeb / App / Integration]
+    C[GitHub Actions<br/>build / version / publish / deploy trigger]
+    D[GitHub 퍼블리싱 VM<br/>self-hosted runner 또는 publish 실행 VM]
+  end
+
+  subgraph GITOPS[배포 정의 영역]
+    direction TB
+    H[GitOps Repo<br/>IWON-vm-lab<br/>Terraform / Ansible / YAML]
+  end
+
+  subgraph ADO[Azure DevOps 영역]
+    direction TB
+    E[Azure DevOps Project<br/>iwon-smart-ops]
+    G[Azure Pipeline<br/>iwon-vm-cd]
+    F[Azure Artifacts<br/>smart-web / smart-was / smart-app / smart-integration]
+  end
+
+  subgraph TARGET[배포 대상 / 실행 VM]
+    direction TD
+    J[bastion VM<br/>bastion01<br/>self-hosted Azure DevOps agent]
+    W1[web VM<br/>web01 / nginx]
+    W2[was VM<br/>was01 / was.service]
+    W3[app VM<br/>app01 / app.service]
+    W4[integration VM<br/>smartcontract01 / integration.service]
+  end
+
+  A -->|git push / PR| B
+  B -->|workflow trigger| C
+  C -->|runner 실행| D
+  D -->|artifact publish| F
+  D -->|REST API 호출| G
+  G -->|gitops YAML checkout| H
+  G -->|feed artifact download| F
+  F -->|Pipeline에서\njob 실행 / agent 할당| J
+  J -->|Ansible / SSH jump| W1
+  J -->|Ansible / SSH jump| W2
+  J -->|Ansible / SSH jump| W3
+  J -->|Ansible / SSH jump| W4
+  E --- G
+  E --- F
+  CA -->|git commit / push| H
+
+  style DEV fill:#eef7f1,stroke:#2f6b45,color:#173524 ARCHITECT
+  style ARCHITECT fill:#eef7f1,stroke:#2f6b45,color:#173524
+  style GH fill:#eef3fb,stroke:#275ea3,color:#17345c
+  style ADO fill:#fff6e8,stroke:#a66a00,color:#4d3200
+  style GITOPS fill:#f9eef7,stroke:#8f3c7a,color:#4a193f
+  style TARGET fill:#f3f8ff,stroke:#3b82f6,color:#17345c
+```
 ### 1.1 전체 흐름도
 
 개발자 리포지토리에는 애플리케이션 소스만 두고, 배포 정의(YAML/Ansible/Terraform)는 gitops 리포지토리에서 중앙 관리합니다.
@@ -273,13 +338,15 @@ GitHub Actions가 REST API로 넘겨야 하는 값은 현재 YAML parameter 와 
 
 | Azure DevOps parameter | 값 생성 기준 | 예시 |
 | --- | --- | --- |
-| `runTerraform` | 일반 배포는 `false` 고정 | `false` |
+| `runTerraform` | 일반 배포는 `false`, 인프라까지 포함하면 `true` | `false` |
 | `deployTarget` | 리포지토리 또는 서비스 종류에 따라 결정 | `was` |
 | `artifactFeedName` | 고정 | `iwon-smart-feed` |
 | `artifactFeedView` | 현재 기본값 유지 | `""` |
 | `mavenPackageDefinition` | 서비스별 패키지 정의 직접 전달 | `com.iteyes.smart:smart-was` |
 | `mavenPackageVersion` | GitHub Actions에서 계산한 불변 버전 사용 | `1.0.0-main.7c2d9a1` |
 | `artifactPattern` | `web` 는 `*.zip`, 나머지는 `*.jar` | `*.jar` |
+| `bootstrapAdoAgent` | 최초 1회 또는 장애 복구 시 self-hosted agent 자동 설치가 필요하면 `true` | `true` |
+| `bootstrapAgentTarget` | ADO agent 를 설치/등록할 inventory 대상 | `bastion` |
 
 서비스별 기본 매핑은 아래와 같습니다.
 
@@ -293,6 +360,47 @@ Web/WAS 단일 저장소 규칙:
 - IWonPaymentWeb/web 폴더 파이프라인은 `deployTarget=web` 으로만 호출
 - IWonPaymentWeb/was 폴더 파이프라인은 `deployTarget=was` 으로만 호출
 - 두 파이프라인은 동일 저장소를 보더라도 배포 대상이 섞이지 않도록 분리 유지
+
+#### 2.6.1 실제 실행 예시 (Run Parameters)
+
+1. **최초 1회 bootstrap + 배포**
+
+```yaml
+runTerraform: false
+deployTarget: was
+artifactFeedName: iwon-smart-feed
+artifactFeedView: ""
+mavenPackageDefinition: com.iteyes.smart:iwon-poc
+mavenPackageVersion: latest
+artifactPattern: "*.jar"
+bootstrapAdoAgent: true
+bootstrapAgentTarget: bastion
+```
+
+2. **일반 배포(이미 agent 가 online 인 경우)**
+
+```yaml
+runTerraform: false
+deployTarget: was
+artifactFeedName: iwon-smart-feed
+artifactFeedView: ""
+mavenPackageDefinition: com.iteyes.smart:smart-was
+mavenPackageVersion: 1.0.0-main.7c2d9a1
+artifactPattern: "*.jar"
+bootstrapAdoAgent: false
+bootstrapAgentTarget: bastion
+```
+
+3. **bootstrap 시 추가로 필요한 변수/시크릿**
+
+```text
+ADO_AGENT_URL=https://dev.azure.com/iteyes-ito
+ADO_AGENT_POOL=Default
+ADO_AGENT_PAT=<Azure DevOps PAT>
+ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE=id_rsa
+```
+
+> 참고: `bootstrapAdoAgent=true` 단계는 `ubuntu-latest` 또는 이미 online 인 기존 agent 중 하나가 최소 1개는 있어야 최초 실행이 가능합니다.
 
 ### 2.7 GitHub Actions 호출 예시 (IWonPaymentWeb 전용 2개 파일)
 

@@ -43,6 +43,16 @@ parameters:
     type: string
     default: ""
 
+  - name: bootstrapAdoAgent
+    displayName: Bootstrap Azure DevOps self-hosted agent
+    type: boolean
+    default: false
+
+  - name: bootstrapAgentTarget
+    displayName: Inventory group/host to register as ADO agent
+    type: string
+    default: bastion
+
 variables:
   - name: ENVIRONMENT_NAME_INFRA
     value: iwon-gitops-infra
@@ -75,6 +85,14 @@ variables:
     value: ""
   - name: ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE
     value: "id_rsa"
+  - name: ADO_AGENT_BOOTSTRAP_PLAYBOOK_PATH
+    value: gitops/ansible/install-ado-agent.yml
+  - name: ADO_AGENT_URL
+    value: ""
+  - name: ADO_AGENT_POOL
+    value: Default
+  - name: ADO_AGENT_PAT
+    value: ""
 
   - name: TFSTATE_RG
     value: ""
@@ -89,6 +107,51 @@ variables:
   - group: iwon-smart-ops-vg
 
 stages:
+  - stage: BootstrapAgent
+    displayName: Bootstrap self-hosted Azure DevOps agent
+    condition: and(succeeded(), eq('${{ parameters.bootstrapAdoAgent }}', true))
+    jobs:
+      - job: InstallAdoAgent
+        displayName: Install/register ADO agent on bootstrap host
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+
+          - task: InstallSSHKey@0
+            displayName: Install SSH private key for bootstrap host
+            inputs:
+              addEntryToConfig: false
+              hostName: bastion01
+              userName: $(ANSIBLE_SSH_USER)
+              knownHostsEntry: ""
+              sshPublicKey: ""
+              sshKeySecureFile: $(ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE)
+
+          - bash: |
+              set -euo pipefail
+              sudo apt-get update
+              sudo apt-get install -y ansible python3-pip
+            displayName: Install Ansible for agent bootstrap
+
+          - bash: |
+              set -euo pipefail
+
+              if [ -z "$(ADO_AGENT_URL)" ] || [ -z "$(ADO_AGENT_POOL)" ] || [ -z "$(ADO_AGENT_PAT)" ]; then
+                echo "##vso[task.logissue type=error]ADO_AGENT_URL, ADO_AGENT_POOL and ADO_AGENT_PAT must be set to bootstrap the self-hosted agent."
+                exit 1
+              fi
+
+              export ANSIBLE_HOST_KEY_CHECKING=False
+              export ANSIBLE_CONFIG="$(Build.SourcesDirectory)/$(ANSIBLE_CONFIG_PATH)"
+
+              ansible-playbook \
+                -i "$(Build.SourcesDirectory)/$(STATIC_ANSIBLE_INVENTORY_PATH)" \
+                "$(Build.SourcesDirectory)/$(ADO_AGENT_BOOTSTRAP_PLAYBOOK_PATH)" \
+                --limit "${{ parameters.bootstrapAgentTarget }}" \
+                --extra-vars "ado_url=$(ADO_AGENT_URL) ado_pool=$(ADO_AGENT_POOL) ado_pat=$(ADO_AGENT_PAT) ado_agent_user=$(ANSIBLE_SSH_USER)"
+            displayName: Bootstrap Azure DevOps self-hosted agent
+
   - stage: Terraform
     displayName: Terraform Apply
     condition: and(succeeded(), eq('${{ parameters.runTerraform }}', true))
@@ -97,7 +160,7 @@ stages:
         displayName: Apply Terraform
         environment: $(ENVIRONMENT_NAME_INFRA)
         pool:
-          name: Default
+          name: $(ADO_AGENT_POOL)
         strategy:
           runOnce:
             deploy:
@@ -151,7 +214,7 @@ stages:
         displayName: Deploy target service
         environment: $(ENVIRONMENT_NAME_APP)
         pool:
-          name: Default
+          name: $(ADO_AGENT_POOL)
         strategy:
           runOnce:
             deploy:

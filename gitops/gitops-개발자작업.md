@@ -38,7 +38,7 @@
 - 필요 시 `az`
 
 ### 1.3 GitHub Secrets 준비
-관련된 시크릿 항목의 값은 아키텍트에게 요청한다.
+관련된 시크릿 항목의 값은 아키텍트에게 요청하여 깃헙 리파지토리에 등록한다.
 공통 시크릿:
 
 - `ADO_ORG`
@@ -60,11 +60,83 @@
 ## 2. 권장 진행 순서
 
 1. 소스 저장소에서 기능 수정
-2. 로컬 또는 CI에서 빌드/기본 검증
-3. GitHub Actions에서 Azure Artifacts Feed publish
-4. Azure DevOps에서 `deployTarget`과 버전을 명시해 CD 실행
-5. 대상 VM에서 서비스/포트/로그/헬스 확인
-6. 이상 시 즉시 이전 고정 버전으로 롤백
+2. 로컬 에서 빌드/기본 검증
+3. git push and merge to main
+4. GitHub Actions에서 Azure Artifacts Feed publish
+   →개발자가 push/merge(main) 하면 workflow가 실행되면서 자동 수행
+5. Azure DevOps에서 `deployTarget`과 버전을 명시해 CD 실행
+   → GitHub Actions가 publish 직후 REST API로 ADO pipeline을 호출해서 자동 수행
+6. 대상 VM에서 서비스/포트/로그/헬스 확인
+7. 이상 시 즉시 이전 고정 버전으로 롤백
+
+### 2.0 git main merge 기준
+- 개발용 브랜치에서 작업한 내용을 `main` 브랜치로 병합한다. 병합 후에는 `main` 브랜치가 최신 상태로 유지되도록 원격 저장소에 푸시한다.
+- branch 명 예시: `dev`
+- 병합 명령 예시:
+```Powershell
+git checkout main
+git pull origin main
+git merge <branch명> #dev
+git push origin main
+```
+### 2.1 `build.gradle` 에 `publish` 설정이 왜 필요한가
+
+현재 구조에서는 **소스 저장소에서 산출물을 Azure Artifacts Feed로 올린 뒤**, Azure DevOps가 그 버전을 내려받아 배포한다.
+즉, 애플리케이션 소스 저장소의 `build.gradle` 에 `maven-publish` 설정이 없으면 **Feed publish 자체가 되지 않으므로 CD가 이어지지 않는다.**
+
+정리하면:
+- `IWonPaymentWeb/web`, `IWonPaymentWeb/was`, `IWonPaymentApp`, `IWonPaymentIntegration`의 `build.gradle` 에는 `publish` 설정이 필요하다.
+- `IWON-vm-lab/gitops` 저장소에는 Java 산출물을 만들지 않으므로 `build.gradle publish` 설정이 필요 없다.
+
+### 2.2 `build.gradle` publish 템플릿
+
+아래 템플릿은 `gitops/gitops구성방안.md` 기준으로 바로 적용 가능한 최소 예시다.
+
+```gradle
+plugins {
+    id 'java'
+    id 'maven-publish'
+}
+
+group = 'com.iteyes.smart'
+version = System.getenv("APP_VERSION") ?: "0.0.0-local"
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifactId = 'smart-was' // 예: smart-web / smart-was / smart-app / smart-integration
+        }
+    }
+    repositories {
+        maven {
+            name = "AzureArtifacts"
+            url = uri("https://pkgs.dev.azure.com/iteyes-ito/iwon-smart-ops/_packaging/iwon-smart-feed/maven/v1")
+            credentials {
+                username = "AZURE_DEVOPS_PAT"
+                password = System.getenv("AZURE_ARTIFACTS_ENV_ACCESS_TOKEN") ?: ""
+            }
+        }
+    }
+}
+```
+
+### 2.3 저장소별 적용 포인트
+
+| 저장소/모듈 | `artifactId` 예시 | 비고 |
+|---|---|---|
+| `IWonPaymentWeb/web` | `smart-web` | 산출물 패턴 `*.zip` 또는 웹 빌드 산출물 구조에 맞게 조정 |
+| `IWonPaymentWeb/was` | `smart-was` | 기본 `*.jar` |
+| `IWonPaymentApp` | `smart-app` | 기본 `*.jar` |
+| `IWonPaymentIntegration` | `smart-integration` | 기본 `*.jar` |
+
+### 2.4 개발자 적용 체크포인트
+
+- `plugins` 에 `id 'maven-publish'` 가 포함되어 있는가?
+- `artifactId` 가 배포 대상과 일치하는가?
+- `version` 이 `APP_VERSION` 기반 불변 버전인가?
+- GitHub Actions 에서 `./gradlew publish` 를 실제 호출하는가?
+- `AZURE_ARTIFACTS_ENV_ACCESS_TOKEN` 이 GitHub Secret 또는 환경변수로 주입되는가?
 
 ---
 
@@ -95,6 +167,30 @@
 - `integration`
   - `/opt/apps/integration/IWonPaymentIntegration-0.0.1-SNAPSHOT.jar` 반영 여부
   - `integration.service` 상태 및 Kafka 연동 로그 확인
+
+### 3.2 VM 장애 시 반자동 롤백 방식
+
+Java 서비스 VM(`was01`, `app01`, `smartcontract01`)에는 배포 시 아래가 자동 반영된다.
+
+1. 새 버전 배포 전에 현재 JAR를 `backup/` 폴더에 사전 백업
+2. 직전 버전을 빠르게 되돌릴 수 있도록 `rollback.sh` 생성
+3. 운영자(개발자)가 VM에서 `rollback.sh` 를 실행해 이전 버전으로 즉시 복구 가능
+
+예시 경로:
+- `was01` → `/opt/apps/was/backup/`, `/opt/apps/was/rollback.sh`
+- `app01` → `/opt/apps/app/backup/`, `/opt/apps/app/rollback.sh`
+- `smartcontract01` → `/opt/apps/integration/backup/`, `/opt/apps/integration/rollback.sh`
+
+사용 예시:
+
+```bash
+cd /opt/apps/was
+./rollback.sh list               # 백업 버전 목록 확인
+sudo ./rollback.sh               # 가장 최근 백업본으로 롤백
+sudo ./rollback.sh app.jar.previous
+```
+
+> 현재 구조의 롤백은 **완전 자동**이 아니라, 운영자/개발자가 VM에서 상태를 확인한 뒤 `rollback.sh` 를 실행하는 **반자동 방식**이다.
 
 ---
 
