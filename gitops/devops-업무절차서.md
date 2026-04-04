@@ -1061,3 +1061,37 @@ ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE=id_rsa
 | 3. ADO 파이프라인 기동 | curl 호출 후 `Run ID` 반환, ADO에서 실행 내역 확인 | ADO > Pipelines > `iwon-vm-cd` > 최근 실행 |
 
 3단계가 모두 통과하면 GitOps 자동 배포 체인이 정상 연결된 것이다.
+
+### 7. 알려진 에러 및 해결 방법
+
+### ❌ azureSubscription 에러
+```
+The pipeline is not valid. Job TerraformApply: Step input azureSubscription 
+references service connection which could not be found.
+```
+**해결:** YAML에서 `$(AZURE_SERVICE_CONNECTION)` → `iwon-smart-ops-sc` 하드코딩
+
+---
+
+### ❌ No hosted parallelism 에러
+```
+No hosted parallelism has been purchased or granted.
+```
+azure devops에서 호스티드 에이전트 풀을 사용할 수 없는 상태로, 자체 에이전트 풀 구성 또는 Microsoft에 병렬성 요청 필요.
+
+agent 풀과 에이전트 상태 확인 명령:
+```
+$poolId = az pipelines pool list --organization https://dev.azure.com/iteyes-ito --query "[?name=='Default'].id | [0]" -o tsv; Write-Host "POOL_ID=$poolId"; az pipelines agent list --organization https://dev.azure.com/iteyes-ito --pool-id $poolId --query "[].{name:name,enabled:enabled,status:status,version:version}" -o table
+```
+
+**해결 방법 1 (무료, 2~3 영업일):** https://aka.ms/azpipelines-parallelism-request 신청  
+**해결 방법 2 (즉시):** Self-hosted Agent 구성 후 YAML 수정
+```yaml
+# 변경 전
+pool:
+  vmImage: ubuntu-latest
+
+# 변경 후
+pool:
+  name: <agent-pool-name>
+```

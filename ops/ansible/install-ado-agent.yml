@@ -11,7 +11,7 @@
     ado_agent_name: "{{ inventory_hostname }}-ado"
     ado_agent_work_dir: "_work"
     ado_agent_replace: false
-    ado_agent_download_url: "https://vstsagentpackage.azureedge.net/agent/{{ ado_agent_version }}/vsts-agent-{{ ado_agent_platform }}-{{ ado_agent_version }}.tar.gz"
+    ado_agent_download_url: "https://download.agent.dev.azure.com/agent/{{ ado_agent_version }}/vsts-agent-{{ ado_agent_platform }}-{{ ado_agent_version }}.tar.gz"
 
   pre_tasks:
     - name: Validate required variables

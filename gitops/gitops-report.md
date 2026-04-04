@@ -611,6 +611,13 @@ references service connection which could not be found.
 ```
 No hosted parallelism has been purchased or granted.
 ```
+azure devops에서 호스티드 에이전트 풀을 사용할 수 없는 상태로, 자체 에이전트 풀 구성 또는 Microsoft에 병렬성 요청 필요.
+
+agent 풀과 에이전트 상태 확인 명령:
+```
+$poolId = az pipelines pool list --organization https://dev.azure.com/iteyes-ito --query "[?name=='Default'].id | [0]" -o tsv; Write-Host "POOL_ID=$poolId"; az pipelines agent list --organization https://dev.azure.com/iteyes-ito --pool-id $poolId --query "[].{name:name,enabled:enabled,status:status,version:version}" -o table
+```
+
 **해결 방법 1 (무료, 2~3 영업일):** https://aka.ms/azpipelines-parallelism-request 신청  
 **해결 방법 2 (즉시):** Self-hosted Agent 구성 후 YAML 수정
 ```yaml
