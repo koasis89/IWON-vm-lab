@@ -41,10 +41,10 @@
 관련된 시크릿 항목의 값은 아키텍트에게 요청하여 깃헙 리파지토리에 등록한다.
 공통 시크릿:
 
-- `ADO_ORG`
-- `ADO_PROJECT`
-- `ADO_PIPELINE_ID`
-- `ADO_PAT`
+1. `ADO_ORG` (`iteyes-ito`)
+2. `ADO_PROJECT` (`iwon-smart-ops`)
+3. `ADO_PAT` (개인 액세스 토큰)
+4. `ADO_PIPELINE_ID` (2)
 
 > `ADO_PAT` 가 채팅/문서/로그에 노출되면 즉시 **폐기(revoke) 후 재발급**한다.
 
@@ -191,6 +191,80 @@ sudo ./rollback.sh app.jar.previous
 ```
 
 > 현재 구조의 롤백은 **완전 자동**이 아니라, 운영자/개발자가 VM에서 상태를 확인한 뒤 `rollback.sh` 를 실행하는 **반자동 방식**이다.
+
+### 3.3 수동 롤백 절차
+
+장애 발생 시에는 아래 순서로 **수동 롤백**을 수행한다.
+
+#### 3.3.1 Web 수동 롤백
+
+Web(`web01`)은 현재 `rollback.sh` 가 없으므로, **직전 정상 zip 버전을 다시 배포**하는 방식으로 되돌린다.
+
+```bash
+ssh bastion01
+ssh iwon@10.0.2.10
+
+sudo mkdir -p /opt/apps/web/manual-backup
+sudo cp -r /var/www/html /opt/apps/web/manual-backup/html_$(date +%Y%m%d_%H%M%S)
+
+# 직전 정상 zip 확보 후
+sudo rm -rf /var/www/html/*
+sudo unzip -oq /opt/vm-lab/html.zip -d /var/www/html
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+확인 포인트:
+- `curl -I https://iwon-smart.site`
+- `sudo systemctl status nginx`
+- `/var/log/nginx/error.log`
+
+#### 3.3.2 WAS/App/Integration 수동 롤백
+
+Java 서비스는 `rollback.sh` 를 이용하는 것이 가장 빠르다.
+
+예시(WAS):
+
+```bash
+ssh bastion01
+ssh was01
+
+cd /opt/apps/was
+./rollback.sh list
+sudo ./rollback.sh
+sudo systemctl status was
+```
+
+예시(App):
+
+```bash
+ssh bastion01
+ssh app01
+cd /opt/apps/app
+./rollback.sh list
+sudo ./rollback.sh
+sudo systemctl status app
+```
+
+예시(Integration):
+
+```bash
+ssh bastion01
+ssh smartcontract01
+cd /opt/apps/integration
+./rollback.sh list
+sudo ./rollback.sh
+sudo systemctl status integration
+```
+
+#### 3.3.3 수동 롤백 공통 체크리스트
+
+- [ ] 현재 장애 증상과 시각을 기록했는가?
+- [ ] 직전 정상 버전을 확인했는가?
+- [ ] 롤백 후 `systemctl status` 를 확인했는가?
+- [ ] 포트 리슨/헬스체크를 확인했는가?
+- [ ] 로그(`/var/log/iwon/*.log`, `journalctl`)를 확인했는가?
+- [ ] 필요 시 ADO 배포 이력에 장애 원인을 메모했는가?
 
 ---
 

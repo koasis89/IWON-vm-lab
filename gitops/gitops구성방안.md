@@ -25,7 +25,7 @@
 
 ### 1.0 Git Ops 개념도
 
-아래 개념도는 **개발자PC → GitHub Repo → GitHub Actions → GitHub 퍼블리싱 VM → Azure DevOps(Project / Pipeline / Artifacts) → bastion VM(self-hosted ADO agent) → 대상 VM** 간의 구성 관계를 보여준다.
+Git Ops 개념도는 **개발자PC → GitHub Repo → GitHub Actions → GitHub 퍼블리싱 VM → Azure DevOps(Project / Pipeline / Artifacts) → bastion VM(self-hosted ADO agent) → 대상 VM** 간의 구성 관계를 보여준다.
 
 ```mermaid
 flowchart TD
@@ -34,7 +34,12 @@ flowchart TD
   end
   
   subgraph ARCHITECT[운영, 배포 아키텍트]
-    CA[아키텍트 PC<br/>gitops 변경 / git commit / push]
+    CA[아키텍트 PC<br/>Terraform/Ansible/YAML <br/>작성 및 관리]
+  end
+  
+  subgraph GITOPS[GitHub 배포 정의 영역]
+    direction TB
+    H[GitOps Repo<br/>IWON-vm-lab<br/>Terraform / Ansible / YAML]
   end
 
   subgraph GH[GitHub 영역]
@@ -42,11 +47,6 @@ flowchart TD
     B[GitHub Repo<br/>IWonPaymentWeb / App / Integration]
     C[GitHub Actions<br/>build / version / publish / deploy trigger]
     D[GitHub 퍼블리싱 VM<br/>self-hosted runner 또는 publish 실행 VM]
-  end
-
-  subgraph GITOPS[배포 정의 영역]
-    direction TB
-    H[GitOps Repo<br/>IWON-vm-lab<br/>Terraform / Ansible / YAML]
   end
 
   subgraph ADO[Azure DevOps 영역]
@@ -58,19 +58,20 @@ flowchart TD
 
   subgraph TARGET[배포 대상 / 실행 VM]
     direction TD
-    J[bastion VM<br/>bastion01<br/>self-hosted Azure DevOps agent]
+    J[bastion VM<br/>bastion01<br/> Azure-DevOps-agent]
     W1[web VM<br/>web01 / nginx]
     W2[was VM<br/>was01 / was.service]
     W3[app VM<br/>app01 / app.service]
     W4[integration VM<br/>smartcontract01 / integration.service]
   end
 
+  CA -->|git commit / push| H
   A -->|git push / PR| B
   B -->|workflow trigger| C
   C -->|runner 실행| D
   D -->|artifact publish| F
   D -->|REST API 호출| G
-  G -->|gitops YAML checkout| H
+  H -->|gitops YAML checkout| E
   G -->|feed artifact download| F
   F -->|Pipeline에서\njob 실행 / agent 할당| J
   J -->|Ansible / SSH jump| W1
@@ -79,7 +80,6 @@ flowchart TD
   J -->|Ansible / SSH jump| W4
   E --- G
   E --- F
-  CA -->|git commit / push| H
 
   style DEV fill:#eef7f1,stroke:#2f6b45,color:#173524 ARCHITECT
   style ARCHITECT fill:#eef7f1,stroke:#2f6b45,color:#173524
@@ -88,6 +88,19 @@ flowchart TD
   style GITOPS fill:#f9eef7,stroke:#8f3c7a,color:#4a193f
   style TARGET fill:#f3f8ff,stroke:#3b82f6,color:#17345c
 ```
+
+#### 설명
+
+위 개념도는 **소스 변경(CI)** 과 **운영 배포(CD)** 의 책임을 분리한 구조를 보여준다.
+
+1. **개발자 PC** 는 `IWonPaymentWeb`, `IWonPaymentApp`, `IWonPaymentIntegration` 같은 소스 저장소에만 코드를 반영한다.
+2. **GitHub Actions / 퍼블리싱 VM** 은 소스를 빌드하고 버전을 부여한 뒤, 결과물(`jar`, `zip`)을 **Azure Artifacts Feed** 에 업로드한다.
+3. **아키텍트 PC** 는 `IWON-vm-lab` GitOps 저장소에서 `Terraform`, `Ansible`, `Azure Pipeline YAML` 을 관리하며, 배포 방식과 인프라 정의를 통제한다.
+4. **Azure DevOps Pipeline** 은 GitOps 저장소의 배포 정의를 읽고, Feed 에 올라온 산출물을 기준으로 CD를 수행한다.
+5. 실제 배포 작업은 **bastion01** 에 설치된 **self-hosted Azure DevOps agent** 가 수행하며, 이 bastion VM이 각 대상 VM(`web01`, `was01`, `app01`, `smartcontract01`)으로 SSH/Ansible 배포를 중계한다.
+
+즉, 이 구조의 핵심은 **GitHub는 빌드와 publish 담당**, **GitOps 저장소는 배포 기준 관리**, **Azure DevOps + bastion agent는 실제 운영 배포 실행** 역할을 맡는다는 점이다.
+
 ### 1.1 전체 흐름도
 
 개발자 리포지토리에는 애플리케이션 소스만 두고, 배포 정의(YAML/Ansible/Terraform)는 gitops 리포지토리에서 중앙 관리합니다.

@@ -23,6 +23,14 @@
           - old: http://127.0.0.1:3000
             new: https://iwon-smart.site
     java_env_vars:
+      SPRING_DATASOURCE_URL: "jdbc:mariadb://10.0.2.50:3306/appdb?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul"
+      SPRING_DATASOURCE_USERNAME: "appuser"
+      SPRING_DATASOURCE_PASSWORD: "appuserpassword123!"
+      APP_DATASOURCE_MARIA120_JDBC_URL: "jdbc:mariadb://10.0.2.50:3306/appdb?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul"
+      APP_DATASOURCE_MARIA120_USERNAME: "appuser"
+      APP_DATASOURCE_MARIA120_PASSWORD: "appuserpassword123!"
+      IWON_WALLET_API_BASE_URL: "http://10.0.2.40:8080"
+      IWON_TOKEN_API_BASE_URL: "http://10.0.2.40:8080"
       KAFKA_BOOTSTRAP_SERVERS: "{{ kafka_client_bootstrap_servers }}"
       KAFKA_SECURITY_PROTOCOL: "{{ kafka_client_security_protocol }}"
       KAFKA_TLS_ENABLED: "{{ kafka_client_tls_enabled }}"
