@@ -284,6 +284,11 @@ stages:
                       echo "Terraform outputs were not generated even though TFSTATE variables are configured."
                       exit 1
                     fi
+
+                    if grep -q '^ansible_ssh_common_args=' "$(ANSIBLE_INVENTORY_OUT)"; then
+                      sed -i '/^ansible_ssh_common_args=/d' "$(ANSIBLE_INVENTORY_OUT)"
+                      echo "Removed ProxyJump from generated inventory for self-hosted agent execution."
+                    fi
                   displayName: Generate inventory from Terraform outputs
                   env:
                     PATH: $(GIT_BASH_DIR);$(PATH)
