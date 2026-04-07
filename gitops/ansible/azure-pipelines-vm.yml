@@ -262,7 +262,7 @@ stages:
                     fi
 
                     if [ -f "$(TF_OUTPUT_JSON)" ]; then
-                      python "$(Build.SourcesDirectory)/gitops/scripts/generate_inventory_from_tf.py" \
+                      python3 "$(Build.SourcesDirectory)/gitops/scripts/generate_inventory_from_tf.py" \
                         --tf-output "$(TF_OUTPUT_JSON)" \
                         --output "$(ANSIBLE_INVENTORY_OUT)" \
                         --ssh-user "$(ANSIBLE_SSH_USER)" \
@@ -304,8 +304,8 @@ stages:
                       sudo apt-get update
                       sudo apt-get install -y ansible python3-pip
                     else
-                      python -m pip install --upgrade pip
-                      python -m pip install ansible
+                      python3 -m pip install --upgrade pip
+                      python3 -m pip install ansible
                     fi
                   displayName: Install Ansible
                   env:
@@ -354,7 +354,7 @@ stages:
                       exit 1
                     fi
 
-                    ENCODED_DEF="$(python -c "import os,urllib.parse; print(urllib.parse.quote(os.environ['PKG_DEF'], safe=''))")"
+                    ENCODED_DEF="$(python3 -c "import os,urllib.parse; print(urllib.parse.quote(os.environ['PKG_DEF'], safe=''))")"
 
                     API_URL="https://feeds.dev.azure.com/${ORG_NAME}/${PROJECT_SEGMENT}/_apis/Packaging/Feeds/${FEED_NAME}/Packages?packageNameQuery=${ENCODED_DEF}&protocolType=maven&includeAllVersions=true&api-version=7.1-preview.1"
                     TMP_JSON="$(mktemp)"
@@ -390,7 +390,7 @@ stages:
                     printf '    print(f"Precheck passed: {pd}=={pv}"); sys.exit(0)\n' >> "${PYCHECK}"
                     printf 'samp=", ".join(sorted(set(avail),reverse=True)[:10])\n' >> "${PYCHECK}"
                     printf 'print(f"##vso[task.logissue type=error]Version not found. def={pd} req={pv} avail={samp}"); sys.exit(1)\n' >> "${PYCHECK}"
-                    python "${PYCHECK}" "${TMP_JSON}" "${PKG_DEF}" "${PKG_VERSION}" "${FEED_NAME}" "${FEED_VIEW}"
+                    python3 "${PYCHECK}" "${TMP_JSON}" "${PKG_DEF}" "${PKG_VERSION}" "${FEED_NAME}" "${FEED_VIEW}"
                   displayName: Precheck Maven package availability
                   env:
                     PATH: $(GIT_BASH_DIR);$(PATH)
