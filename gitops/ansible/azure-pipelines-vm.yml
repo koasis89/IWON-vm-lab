@@ -170,29 +170,24 @@ stages:
                     artifact: terraform-output
                     path: $(Pipeline.Workspace)/downloaded-terraform
 
-                - task: AzureCLI@2
+                - bash: |
+                    set -euo pipefail
+
+                    if [ -z "$(TFSTATE_RG)" ] || [ -z "$(TFSTATE_STORAGE)" ]; then
+                      echo "##vso[task.logissue type=warning]TFSTATE_RG/TFSTATE_STORAGE is not configured. Falling back to static inventory for PoC run."
+                      exit 0
+                    fi
+
+                    terraform -chdir="$(TF_WORKING_DIR)" init \
+                      -backend-config="resource_group_name=$(TFSTATE_RG)" \
+                      -backend-config="storage_account_name=$(TFSTATE_STORAGE)" \
+                      -backend-config="container_name=$(TFSTATE_CONTAINER)" \
+                      -backend-config="key=$(TFSTATE_KEY)"
+
+                    mkdir -p "$(Pipeline.Workspace)/generated"
+                    terraform -chdir="$(TF_WORKING_DIR)" output -json > "$(TF_OUTPUT_JSON)"
                   displayName: Export Terraform outputs when Terraform stage is skipped
                   condition: eq('${{ parameters.runTerraform }}', false)
-                  inputs:
-                    azureSubscription: iwon-smart-ops-sc
-                    scriptType: bash
-                    scriptLocation: inlineScript
-                    inlineScript: |
-                      set -euo pipefail
-
-                      if [ -z "$(TFSTATE_RG)" ] || [ -z "$(TFSTATE_STORAGE)" ]; then
-                        echo "##vso[task.logissue type=warning]TFSTATE_RG/TFSTATE_STORAGE is not configured. Falling back to static inventory for PoC run."
-                        exit 0
-                      fi
-
-                      terraform -chdir="$(TF_WORKING_DIR)" init \
-                        -backend-config="resource_group_name=$(TFSTATE_RG)" \
-                        -backend-config="storage_account_name=$(TFSTATE_STORAGE)" \
-                        -backend-config="container_name=$(TFSTATE_CONTAINER)" \
-                        -backend-config="key=$(TFSTATE_KEY)"
-
-                      mkdir -p "$(Pipeline.Workspace)/generated"
-                      terraform -chdir="$(TF_WORKING_DIR)" output -json > "$(TF_OUTPUT_JSON)"
                   env:
                     PATH: $(GIT_BASH_DIR);$(PATH)
 

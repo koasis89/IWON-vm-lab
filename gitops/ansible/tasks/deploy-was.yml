@@ -9,19 +9,6 @@
     java_jar_remote_name: app.jar
     java_log_file: "{{ log_dir }}/was.log"
     java_xml_gpcl_patch: true
-    java_class_patch_specs:
-      - class_path: BOOT-INF/classes/com/godisweb/config/SecurityConfig.class
-        replacements:
-          - old: http://192.168.0.122:9092
-            new: https://www.iwon-smart.site
-          - old: http://192.168.0.122
-            new: https://iwon-smart.site
-      - class_path: BOOT-INF/classes/com/godisweb/config/websocket/WebSocketConfig.class
-        replacements:
-          - old: http://localhost:3000
-            new: https://www.iwon-smart.site
-          - old: http://127.0.0.1:3000
-            new: https://iwon-smart.site
     java_env_vars:
       KAFKA_BOOTSTRAP_SERVERS: "{{ kafka_client_bootstrap_servers }}"
       KAFKA_SECURITY_PROTOCOL: "{{ kafka_client_security_protocol }}"
