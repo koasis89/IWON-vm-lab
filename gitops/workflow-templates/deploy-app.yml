@@ -3,7 +3,10 @@ name: Deploy App Artifact
 on:
   push:
     branches: ["main"]
-      
+    paths:
+      - "godisappserver/**"
+      - ".github/workflows/deploy-app.yml"
+
   workflow_dispatch:
 
 permissions:
@@ -35,6 +38,10 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: gradle
+          cache-dependency-path: |
+            godisappserver/gradle/wrapper/gradle-wrapper.properties
+            godisappserver/build.gradle
+            godisappserver/settings.gradle
 
       - name: Compute immutable version
         shell: bash
@@ -43,12 +50,14 @@ jobs:
           echo "APP_VERSION=1.0.0-app.${SHORT_SHA}" >> "$GITHUB_ENV"
 
       - name: Build
+        working-directory: godisappserver
         shell: bash
         run: |
           chmod +x gradlew
           ./gradlew clean build -x test
 
       - name: Publish app package to Azure Artifacts
+        working-directory: godisappserver
         shell: bash
         env:
           APP_VERSION: ${{ env.APP_VERSION }}

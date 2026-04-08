@@ -8,6 +8,19 @@
 
 ---
 
+## 0. Web/WAS 자동배포 체크리스트
+
+- [ ] `IWonPaymentWeb`의 **`main` 브랜치**에 커밋/푸시한다.
+- [ ] 변경 파일이 `godiswebfront/**` 또는 `godiswebserver/**` 경로에 포함되어 있는지 확인한다.
+- [ ] GitHub Actions 실행 결과가 **성공**인지 확인한다.
+- [ ] Azure Artifacts 업로드 후 ADO `iwon-vm-cd`가 자동 호출되었는지 확인한다.
+- [ ] ADO 배포 결과가 **`completed / succeeded`** 인지 확인한다.
+- [ ] 배포 후 `https://www.iwon-smart.site/` 및 WAS 로그를 간단히 점검한다.
+
+> 일반 소스 수정은 위 체크만 통과하면 `web`/`was`가 자동 반영된다.
+
+---
+
 ## 1. 문서 목적
 
 본 문서는 현재 `gitops` 저장소의 **Terraform / Ansible / 운영 문서**를 기준으로,
@@ -246,6 +259,7 @@ ssh bastion01
 ssh was01
 sudo systemctl status was
 sudo journalctl -u was -n 200 --no-pager
+tail -f /var/log/syslog 
 ```
 
 가능 시 추가 확인:
@@ -381,7 +395,81 @@ sudo ./rollback.sh
 - 외부 헬스체크를 분리하려면 nginx에 `/actuator/` location을 추가하는 것이 좋다.
 - `godiswebfront` 번들 크기 경고와 `npm audit` 취약점은 차후 최적화 대상으로 남겨둔다.
 
-## 10. 최종 제안
+## 10. 2026-04-07 로그인 요청 프론트 수정 및 재배포 절차
+
+### 10.1 원인 및 수정 내용
+
+로그인 화면에서 아이디/비밀번호가 입력되어 보여도, 브라우저 자동완성/상태 불일치로 인해 `/api/auth/login`에 **빈 body**가 전달될 수 있는 문제가 확인되었다.
+
+이번 수정에서는 아래 2개 파일을 보완했다.
+
+| 파일 | 수정 내용 |
+|---|---|
+| `godiswebfront/src/login.jsx` | 제출 시 `FormData`로 실제 입력값을 다시 읽고 `trim()` 후 검증하도록 보강 |
+| `godiswebfront/src/libs/Protocol.jsx` | `/auth/login` POST 요청에서 빈 body 전송을 사전에 차단하도록 방어 로직 추가 |
+
+적용 커밋:
+- `IWonPaymentWeb` `main` 브랜치 `c00830f` — `fix: harden frontend login submission`
+
+### 10.2 실제 빌드/배포 절차
+
+#### A. 프론트 수정 반영 후 로컬 빌드 검증
+
+```powershell
+cd C:\Workspace\I-Won\IWonPaymentWeb\godiswebfront
+npm ci
+npm run build
+```
+
+실행 결과:
+- `vite build`
+- `✓ built in 34.41s`
+
+#### B. GitHub Actions 기반 자동 배포 트리거
+
+프론트 소스 수정 후 아래와 같이 `main`에 push하면 `.github/workflows/deploy-web.yml`이 자동 실행된다.
+
+```powershell
+cd C:\Workspace\I-Won\IWonPaymentWeb
+git add godiswebfront/src/login.jsx godiswebfront/src/libs/Protocol.jsx
+git commit -m "fix: harden frontend login submission"
+git push origin main
+```
+
+자동 배포 흐름:
+1. GitHub Actions에서 `npm install`, `npm run build` 수행
+2. `dist/`를 `smart-web-<version>.zip`으로 패키징
+3. Azure Artifacts Feed `iwon-smart-feed`에 `com.iteyes.smart:smart-web`로 publish
+4. Azure DevOps Pipeline `iwon-vm-cd`를 `deployTarget=web`으로 자동 호출
+5. bastion self-hosted agent가 Ansible로 `web01`에 반영
+
+#### C. 배포 성공 확인
+
+2026-04-07 실제 확인 결과:
+
+```powershell
+az pipelines runs show \
+  --organization https://dev.azure.com/iteyes-ito \
+  --project iwon-smart-ops \
+  --id 38 \
+  --output table
+
+curl -I https://www.iwon-smart.site/
+```
+
+검증 결과:
+- Azure DevOps Run `38` → `completed / succeeded`
+- `https://www.iwon-smart.site/` → `HTTP/1.1 200 OK`
+
+### 10.3 운영 체크 포인트
+
+- 로그인 관련 수정은 **Web 정적 번들 재배포만으로 반영 가능**하다.
+- WAS/DB 재배포 없이도 프론트 단 수정으로 빈 body 전송 문제를 완화할 수 있다.
+- 재현 확인 시 브라우저 개발자도구 `Network` 탭에서 `/api/auth/login`의 `Request Payload`가 비어 있지 않은지 함께 확인한다.
+
+---
+
+## 11. 최종 제안
 
 현재 저장소 구조를 기준으로 보면, **이미 VM 인프라(`vm-azure`)와 VM 배포 자동화(`gitops/ansible/azure-pipelines-vm.yml`)는 상당 부분 준비되어 있다.**
 따라서 이번 작업의 핵심은 **소스 저장소(web/was)에서 산출물을 표준 버전으로 Feed에 올리는 단계**를 먼저 안정화하는 것이다.
@@ -394,4 +482,3 @@ sudo ./rollback.sh
 4. **WAS는 즉시 롤백 가능, Web은 백업 절차 보강 후 운영 전환**
 
 이 계획대로 진행하면 현재 `gitops` 구성과 가장 잘 맞고, 운영 리스크도 최소화할 수 있다.
-

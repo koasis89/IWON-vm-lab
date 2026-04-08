@@ -3,6 +3,14 @@ name: Deploy Integration Artifact
 on:
   push:
     branches: ["main"]
+    paths:
+      - "src/**"
+      - "build.gradle"
+      - "settings.gradle"
+      - "gradle/**"
+      - "gradlew"
+      - "gradlew.bat"
+      - ".github/workflows/deploy-integration.yml"
 
   workflow_dispatch:
 
@@ -35,6 +43,10 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: gradle
+          cache-dependency-path: |
+            gradle/wrapper/gradle-wrapper.properties
+            build.gradle
+            settings.gradle
 
       - name: Compute immutable version
         shell: bash

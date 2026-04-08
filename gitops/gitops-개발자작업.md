@@ -20,7 +20,7 @@
 
 ## 1. 작업 시작 전 준비 체크리스트
 
-### 1.1 소스 저장소와 배포 대상 매핑
+### 1.1 소스 저장소와 배포 대상 매핑(deployTarget 기준 완료)
 
 | 소스 위치 | 대상 서비스 | `deployTarget` |
 |---|---|---|
@@ -37,7 +37,7 @@
 - `ssh`
 - 필요 시 `az`
 
-### 1.3 GitHub Secrets 준비
+### 1.3 GitHub Secrets 준비(리포지토리별 등록 완료)
 관련된 시크릿 항목의 값은 아키텍트에게 요청하여 깃헙 리파지토리에 등록한다.
 공통 시크릿:
 
@@ -88,7 +88,7 @@ git push origin main
 - `IWonPaymentWeb/web`, `IWonPaymentWeb/was`, `IWonPaymentApp`, `IWonPaymentIntegration`의 `build.gradle` 에는 `publish` 설정이 필요하다.
 - `IWON-vm-lab/gitops` 저장소에는 Java 산출물을 만들지 않으므로 `build.gradle publish` 설정이 필요 없다.
 
-### 2.2 `build.gradle` publish 템플릿
+### 2.2 `build.gradle` publish 템플릿(*프로젝트별 추가완료*)
 
 아래 템플릿은 `gitops/gitops구성방안.md` 기준으로 바로 적용 가능한 최소 예시다.
 
@@ -256,6 +256,51 @@ cd /opt/apps/integration
 sudo ./rollback.sh
 sudo systemctl status integration
 ```
+#### 3.3.3 `rollback.sh` 백업 파일명 의미
+`jar.` 뒤의 숫자는 **백업이 만들어진 시점의 Unix epoch timestamp(초)** 입니다.  
+
+예시:
+- `1775624194`  
+  → **1970-01-01 00:00:00 UTC부터 지난 초 수**
+
+이 값은 Ansible의 백업 로직에서 보통 이런 식으로 붙습니다:
+
+```yaml
+{{ java_jar_remote_name }}.{{ ansible_date_time.epoch }}
+```
+
+즉 의미는:
+
+- `IWonPaymentIntegration-0.0.1-SNAPSHOT.jar.1775624194`
+  → 해당 시각에 백업된 JAR
+- `...jar.previous`
+  → 가장 최근 직전 버전을 가리키는 별도 백업본
+
+## 정리
+
+| 파일명 형태 | 의미 |
+|---|---|
+| `*.jar.<숫자>` | 특정 시점의 백업본 |
+| `*.jar.previous` | 바로 이전 버전 백업본 |
+
+## 변환 방법
+
+리눅스에서 바로 확인하려면:
+
+```bash
+date -d @1775624194
+```
+
+한국시간(KST)으로 보려면:
+
+```bash
+TZ=Asia/Seoul date -d @1775624194
+```
+
+### 참고
+- `@숫자` = epoch timestamp
+- `TZ=Asia/Seoul` = 한국시간 기준 표시
+
 
 #### 3.3.3 수동 롤백 공통 체크리스트
 
