@@ -79,5 +79,6 @@ vm-azure/docs/*.mp4
 helm_bak_20260318/.claude/worktrees/
 Azure_VM*.*
 
-keyvalut-secrets/keyvault-list.md
+# --- KeyVault 관련 ---
 keyvalut-secrets/.keyvault-list
+keyvalut-secrets/Azure_KeyVault_요청.xlsx
