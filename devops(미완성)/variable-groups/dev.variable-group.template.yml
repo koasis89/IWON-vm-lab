@@ -1,0 +1,19 @@
+# Azure DevOps Variable Group Template - DEV
+# Create a variable group in Azure DevOps and copy these keys.
+# Mark sensitive keys as secret.
+
+AZURE_SERVICE_CONNECTION: "<service-connection-name>"
+ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE: "<secure-file-name>"
+APPROVER_EMAILS: "devops-team@company.com"
+
+DB_APP_PASSWORD: "<secret>"
+DB_ROOT_PASSWORD: "<secret>"
+
+TFSTATE_RG: "<tfstate-resource-group>"
+TFSTATE_STORAGE: "<tfstate-storage-account>"
+TFSTATE_CONTAINER: "tfstate"
+TFSTATE_KEY: "vm-azure/dev.tfstate"
+
+DB_ROLLBACK_NOTIFY_ENABLED: "true"
+DB_ROLLBACK_NOTIFY_WEBHOOK_URL: "<secret-webhook-url>"
+DB_ROLLBACK_NOTIFY_CHANNEL: "slack"

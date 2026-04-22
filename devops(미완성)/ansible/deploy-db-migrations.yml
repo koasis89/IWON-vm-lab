@@ -1,0 +1,63 @@
+---
+- name: Apply ordered SQL migrations
+  hosts: db
+  become: true
+  gather_facts: false
+  vars:
+    db_migrations_root: backup/db/migrations
+    db_migrations_tmp_dir: "{{ vm_lab_root }}/migrations"
+    db_repo_root: "{{ playbook_dir }}/../.."
+    db_enable_rollback_hook: false
+    db_rollback_notify_enabled: false
+    db_rollback_notify_webhook_url: ""
+    db_rollback_notify_channel: slack
+    db_rollback_notify_context: unknown
+    db_migrations_abs_root: "{{ db_repo_root }}/{{ db_migrations_root }}"
+
+  pre_tasks:
+    - name: Discover SQL migration files on controller
+      ansible.builtin.shell: |
+        set -euo pipefail
+        ROOT="{{ db_migrations_abs_root }}"
+        if [ -d "$ROOT" ]; then
+          find "$ROOT" -type f -name "*.sql" | sort
+        fi
+      args:
+        executable: /bin/bash
+      register: migration_files_cmd
+      changed_when: false
+      delegate_to: localhost
+      become: false
+
+    - name: Assert migration files exist
+      ansible.builtin.assert:
+        that:
+          - migration_files_cmd.stdout_lines | length > 0
+        fail_msg: "No SQL migrations found under {{ db_migrations_abs_root }}."
+
+  tasks:
+    - name: Ensure migration temp directory exists
+      ansible.builtin.file:
+        path: "{{ db_migrations_tmp_dir }}"
+        state: directory
+        owner: "{{ service_user }}"
+        group: "{{ service_user }}"
+        mode: "0755"
+
+    - name: Ensure schema_migrations table exists
+      ansible.builtin.shell: |
+        mariadb -h 127.0.0.1 -u root -p'{{ db_root_password }}' {{ db_name }} <<'SQL'
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+          id BIGINT AUTO_INCREMENT PRIMARY KEY,
+          migration_key VARCHAR(512) NOT NULL UNIQUE,
+          applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        SQL
+      changed_when: false
+
+    - name: Apply SQL migrations in sorted order
+      ansible.builtin.include_tasks: tasks/apply-single-migration.yml
+      loop: "{{ migration_files_cmd.stdout_lines }}"
+      loop_control:
+        loop_var: current_migration_src
+        label: "{{ current_migration_src | replace(db_migrations_abs_root ~ '/', '') }}"

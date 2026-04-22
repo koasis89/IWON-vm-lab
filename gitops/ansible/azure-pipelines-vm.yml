@@ -105,6 +105,7 @@ variables:
 
   # Variable Group values override defaults above when same variable names exist.
   - group: iwon-smart-ops-vg
+  - group: IWON-KV-SECRETS
 
 stages:
   - stage: BootstrapAgent

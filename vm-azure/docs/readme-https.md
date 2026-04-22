@@ -17,9 +17,20 @@ password: 클라우드센터 공용 비번(7979포함된거)
 도메인: iwon-smart.site
 
 www 레코드도 동일하게 연결
-DNS 관리: Namecheap 대시보드에서 직접 관리
+DNS 관리: Azure DNS 관리
 
-![도메인 구매 및 DNS 설정 화면](도메인구매및설정화면.png)
+### Azure DNS 현재 레코드 요약
+
+| 이름 | 형식 | TTL | 값 |
+|---|---|---|---|
+| `@` | A | 3600 | `20.194.3.246` |
+| `@` | NS | 172800 | ns1~4-05.azure-dns.* |
+| `@` | SOA | 3600 | Azure 기본값 |
+| `www` | A | 3600 | `20.194.3.246` |
+| `@`  | TXT Record|3600| `v=spf1 include:spf.efwd.registrar-servers.com ~all` |
+
+
+![Azure DNS 설정 화면]((AzureDNS)도메인설정화면.png)
 
 ## 2. Azure Application Gateway(WAF v2) TLS 종단 + Key Vault 인증서 연동
 

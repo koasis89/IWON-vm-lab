@@ -78,3 +78,6 @@ backup/**
 vm-azure/docs/*.mp4
 helm_bak_20260318/.claude/worktrees/
 Azure_VM*.*
+
+keyvalut-secrets/keyvault-list.md
+keyvalut-secrets/.keyvault-list
