@@ -81,7 +81,32 @@ jobs:
           print(f"created {target}")
           PY
 
+      - name: Check if Web version already exists in Azure Artifacts
+        id: check_version
+        shell: bash
+        env:
+          APP_VERSION: ${{ env.APP_VERSION }}
+          ADO_PAT: ${{ secrets.ADO_PAT }}
+        run: |
+          set -euo pipefail
+          ARTIFACT_URL="https://pkgs.dev.azure.com/${ADO_ORG}/${ADO_PROJECT}/_packaging/${FEED_NAME}/maven/v1/com/iteyes/smart/smart-web/${APP_VERSION}/smart-web-${APP_VERSION}.zip"
+          STATUS=$(curl -sS -o /dev/null -w "%{http_code}" -u ":${ADO_PAT}" "${ARTIFACT_URL}")
+          if [ "${STATUS}" = "200" ]; then
+            echo "already_exists=true" >> "$GITHUB_OUTPUT"
+            echo "Web package already exists. publish step will be skipped. version=${APP_VERSION}"
+          elif [ "${STATUS}" = "404" ]; then
+            echo "already_exists=false" >> "$GITHUB_OUTPUT"
+            echo "Web package does not exist yet. publish step will run. version=${APP_VERSION}"
+          elif [ "${STATUS}" = "401" ] || [ "${STATUS}" = "403" ]; then
+            echo "::error::Cannot check Azure Artifacts package version (HTTP ${STATUS}). Verify PAT permissions."
+            exit 1
+          else
+            echo "::error::Unexpected status while checking Azure Artifacts package version. HTTP=${STATUS}"
+            exit 1
+          fi
+
       - name: Publish web package to Azure Artifacts
+        if: steps.check_version.outputs.already_exists == 'false'
         shell: bash
         env:
           ADO_PAT: ${{ secrets.ADO_PAT }}
