@@ -1,0 +1,426 @@
+trigger: none
+pr: none
+
+parameters:
+  - name: runTerraform
+    displayName: Run Terraform for PROD
+    type: boolean
+    default: false
+
+  - name: deployTarget
+    displayName: Ansible deploy target
+    type: string
+    default: all
+    values:
+      - all
+      - web
+      - was
+      - app
+      - integration
+      - db
+      - kafka
+
+  - name: runDbMigrations
+    displayName: Run ordered DB migrations
+    type: boolean
+    default: false
+
+  - name: enableRollbackHook
+    displayName: Enable rollback hook on migration failure
+    type: boolean
+    default: true
+
+  - name: enforceProdNightWindow
+    displayName: Enforce night deployment window (KST)
+    type: boolean
+    default: true
+
+  - name: prodWindowStartHourKst
+    displayName: Deployment window start hour (KST)
+    type: number
+    default: 22
+
+  - name: prodWindowEndHourKst
+    displayName: Deployment window end hour (KST)
+    type: number
+    default: 6
+
+  - name: dbMigrationsRoot
+    displayName: DB migrations root (repo relative)
+    type: string
+    default: backup/db/migrations/prod
+
+variables:
+  - name: ENVIRONMENT_NAME_INFRA
+    value: iwon-vm-prod-infra
+  - name: ENVIRONMENT_NAME_APP
+    value: iwon-vm-prod-app
+  - name: ENVIRONMENT_NAME_DB
+    value: iwon-vm-prod-db
+
+  - name: TF_WORKING_DIR
+    value: vm-azure
+  - name: ANSIBLE_WORKING_DIR
+    value: vm-ansible
+  - name: TF_OUTPUT_JSON
+    value: $(Pipeline.Workspace)/generated/tf-output.json
+  - name: ANSIBLE_INVENTORY_OUT
+    value: $(Pipeline.Workspace)/generated/inventory.generated.ini
+
+  - name: TFVARS_FILE
+    value: vm-azure/environments/prod.tfvars
+  - name: ANSIBLE_SSH_USER
+    value: iwon
+  - name: ANSIBLE_SSH_KEY_PATH
+    value: ~/.ssh/id_rsa
+  - name: APPROVER_EMAILS
+    value: ''
+  - name: PROD_ALLOWED_TAG_REGEX
+    value: '^((main-v[0-9]+\.[0-9]+\.[0-9]+)|(release-main-[0-9]+\.[0-9]+\.[0-9]+))$'
+
+  - name: DB_ROLLBACK_NOTIFY_ENABLED
+    value: 'false'
+  - name: DB_ROLLBACK_NOTIFY_WEBHOOK_URL
+    value: ''
+  - name: DB_ROLLBACK_NOTIFY_CHANNEL
+    value: slack
+
+  - name: WEB_HTML_ZIP_PATH
+    value: backup/dev-web/html.zip
+  - name: WAS_JAR_PATH
+    value: backup/dev-was/GodisWebServer-0.0.1-SNAPSHOT.jar
+  - name: APP_JAR_PATH
+    value: backup/dev-app/godisappserver-0.0.1-SNAPSHOT.jar
+  - name: INTEGRATION_JAR_PATH
+    value: backup/dev-integration/IWonPaymentIntegration-0.0.1-SNAPSHOT.jar
+
+  - name: TFSTATE_RG
+    value: ''
+  - name: TFSTATE_STORAGE
+    value: ''
+  - name: TFSTATE_CONTAINER
+    value: tfstate
+  - name: TFSTATE_KEY
+    value: vm-azure/prod.tfstate
+
+stages:
+  - stage: GateTerraform
+    displayName: Manual Gate - PROD Terraform
+    condition: and(succeeded(), eq('${{ parameters.runTerraform }}', true))
+    jobs:
+      - job: WaitTerraformApproval
+        pool: server
+        steps:
+          - task: ManualValidation@0
+            timeoutInMinutes: 1440
+            inputs:
+              notifyUsers: $(APPROVER_EMAILS)
+              instructions: 'PROD Terraform 진행 승인 후 Resume 하세요.'
+              onTimeout: reject
+
+  - stage: Terraform
+    displayName: PROD Terraform Apply
+    dependsOn: GateTerraform
+    condition: and(succeeded(), eq('${{ parameters.runTerraform }}', true))
+    jobs:
+      - deployment: TerraformApplyProd
+        displayName: Apply Terraform (PROD)
+        environment: $(ENVIRONMENT_NAME_INFRA)
+        strategy:
+          runOnce:
+            deploy:
+              pool:
+                vmImage: ubuntu-latest
+              steps:
+                - checkout: self
+
+                - task: TerraformInstaller@1
+                  displayName: Install Terraform
+                  inputs:
+                    terraformVersion: latest
+
+                - task: AzureCLI@2
+                  displayName: Terraform init/validate/plan/apply
+                  inputs:
+                    azureSubscription: $(AZURE_SERVICE_CONNECTION)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+
+                      if [ -n "$(TFSTATE_RG)" ] && [ -n "$(TFSTATE_STORAGE)" ]; then
+                        terraform -chdir="$(TF_WORKING_DIR)" init \
+                          -backend-config="resource_group_name=$(TFSTATE_RG)" \
+                          -backend-config="storage_account_name=$(TFSTATE_STORAGE)" \
+                          -backend-config="container_name=$(TFSTATE_CONTAINER)" \
+                          -backend-config="key=$(TFSTATE_KEY)"
+                      else
+                        terraform -chdir="$(TF_WORKING_DIR)" init
+                      fi
+
+                      terraform -chdir="$(TF_WORKING_DIR)" validate
+                      terraform -chdir="$(TF_WORKING_DIR)" plan -var-file="$(TFVARS_FILE)" -out=tfplan
+                      terraform -chdir="$(TF_WORKING_DIR)" apply -auto-approve tfplan
+
+                      RG_NAME=$(terraform -chdir="$(TF_WORKING_DIR)" output -raw resource_group_name)
+                      SUB_ID=$(az account show --query id -o tsv)
+                      echo "Azure Portal: https://portal.azure.com/#@/resource/subscriptions/${SUB_ID}/resourceGroups/${RG_NAME}/overview"
+
+                      mkdir -p "$(Pipeline.Workspace)/generated"
+                      terraform -chdir="$(TF_WORKING_DIR)" output -json > "$(TF_OUTPUT_JSON)"
+
+                - publish: $(TF_OUTPUT_JSON)
+                  artifact: terraform-output-prod
+                  displayName: Publish Terraform outputs (PROD)
+
+  - stage: GateAnsible
+    displayName: Manual Gate - PROD Ansible
+    dependsOn: Terraform
+    condition: always()
+    jobs:
+      - job: WaitAnsibleApproval
+        pool: server
+        steps:
+          - task: ManualValidation@0
+            timeoutInMinutes: 1440
+            inputs:
+              notifyUsers: $(APPROVER_EMAILS)
+              instructions: 'PROD Ansible 배포 진행 승인 후 Resume 하세요.'
+              onTimeout: reject
+
+  - stage: DeploymentWindowCheck
+    displayName: PROD Deployment Window Check (KST)
+    dependsOn: GateAnsible
+    condition: and(succeeded(), eq('${{ parameters.enforceProdNightWindow }}', true))
+    jobs:
+      - job: ValidateProdWindow
+        displayName: Validate deployment time window
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - bash: |
+              set -euo pipefail
+              HOUR_KST=$(TZ=Asia/Seoul date +%H)
+              START=${{ parameters.prodWindowStartHourKst }}
+              END=${{ parameters.prodWindowEndHourKst }}
+
+              echo "Current hour(KST): ${HOUR_KST}"
+              echo "Allowed window(KST): ${START}:00 ~ ${END}:00"
+
+              if [ "${START}" -gt "${END}" ]; then
+                if [ "${HOUR_KST}" -ge "${START}" ] || [ "${HOUR_KST}" -lt "${END}" ]; then
+                  echo "Within allowed deployment window."
+                  exit 0
+                fi
+              else
+                if [ "${HOUR_KST}" -ge "${START}" ] && [ "${HOUR_KST}" -lt "${END}" ]; then
+                  echo "Within allowed deployment window."
+                  exit 0
+                fi
+              fi
+
+              echo "Outside allowed deployment window."
+              exit 1
+            displayName: Check KST deployment window
+
+  - stage: SourcePolicyCheck
+    displayName: PROD Source Policy Check
+    dependsOn: GateAnsible
+    condition: succeeded()
+    jobs:
+      - job: ValidateSourcePolicy
+        displayName: Validate main tag release policy
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+
+          - bash: |
+              set -euo pipefail
+
+              SOURCE_BRANCH="$(Build.SourceBranch)"
+              SOURCE_VERSION="$(Build.SourceVersion)"
+
+              echo "Build.SourceBranch=${SOURCE_BRANCH}"
+              echo "Build.SourceVersion=${SOURCE_VERSION}"
+
+              if [[ "${SOURCE_BRANCH}" != refs/tags/* ]]; then
+                echo "Only tag-triggered/manual tag runs are allowed for PROD."
+                exit 1
+              fi
+
+              TAG_NAME="${SOURCE_BRANCH#refs/tags/}"
+              if ! [[ "${TAG_NAME}" =~ $(PROD_ALLOWED_TAG_REGEX) ]]; then
+                echo "Tag '${TAG_NAME}' does not match allowed pattern: $(PROD_ALLOWED_TAG_REGEX)"
+                exit 1
+              fi
+
+              git fetch --no-tags origin main
+              if git merge-base --is-ancestor "${SOURCE_VERSION}" "origin/main"; then
+                echo "Tag commit is contained in origin/main."
+                exit 0
+              fi
+
+              echo "Tag commit is not contained in origin/main."
+              exit 1
+            displayName: Validate tag and main ancestry
+
+  - stage: AnsibleDeploy
+    displayName: PROD Ansible Deploy
+    dependsOn:
+      - Terraform
+      - GateAnsible
+      - DeploymentWindowCheck
+      - SourcePolicyCheck
+    condition: and(
+      or(and(eq('${{ parameters.runTerraform }}', true), succeeded('Terraform')), eq('${{ parameters.runTerraform }}', false)),
+      or(eq('${{ parameters.enforceProdNightWindow }}', false), succeeded('DeploymentWindowCheck')),
+      succeeded('SourcePolicyCheck')
+      )
+    jobs:
+      - deployment: AnsibleDeployProd
+        displayName: Configure VMs (PROD)
+        environment: $(ENVIRONMENT_NAME_APP)
+        strategy:
+          runOnce:
+            deploy:
+              pool:
+                vmImage: ubuntu-latest
+              steps:
+                - checkout: self
+
+                - task: TerraformInstaller@1
+                  displayName: Install Terraform
+                  inputs:
+                    terraformVersion: latest
+
+                - task: DownloadPipelineArtifact@2
+                  displayName: Download Terraform outputs artifact
+                  condition: eq('${{ parameters.runTerraform }}', true)
+                  inputs:
+                    artifact: terraform-output-prod
+                    path: $(Pipeline.Workspace)/downloaded-terraform
+
+                - task: AzureCLI@2
+                  displayName: Export Terraform outputs when Terraform stage is skipped
+                  condition: eq('${{ parameters.runTerraform }}', false)
+                  inputs:
+                    azureSubscription: $(AZURE_SERVICE_CONNECTION)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+                      terraform -chdir="$(TF_WORKING_DIR)" init
+                      mkdir -p "$(Pipeline.Workspace)/generated"
+                      terraform -chdir="$(TF_WORKING_DIR)" output -json > "$(TF_OUTPUT_JSON)"
+
+                - bash: |
+                    set -euo pipefail
+                    mkdir -p "$(Pipeline.Workspace)/generated"
+                    if [ -f "$(Pipeline.Workspace)/downloaded-terraform/tf-output.json" ]; then
+                      cp "$(Pipeline.Workspace)/downloaded-terraform/tf-output.json" "$(TF_OUTPUT_JSON)"
+                    fi
+
+                    python3 "$(Build.SourcesDirectory)/devops/scripts/generate_inventory_from_tf.py" \
+                      --tf-output "$(TF_OUTPUT_JSON)" \
+                      --output "$(ANSIBLE_INVENTORY_OUT)" \
+                      --ssh-user "$(ANSIBLE_SSH_USER)" \
+                      --ssh-key-path "$(ANSIBLE_SSH_KEY_PATH)"
+                  displayName: Generate inventory from Terraform outputs
+
+                - publish: $(ANSIBLE_INVENTORY_OUT)
+                  artifact: ansible-inventory-prod
+                  displayName: Publish generated inventory (PROD)
+
+                - task: InstallSSHKey@0
+                  displayName: Install SSH private key
+                  inputs:
+                    knownHostsEntry: ''
+                    sshPublicKey: ''
+                    sshKeySecureFile: $(ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE)
+
+                - bash: |
+                    set -euo pipefail
+                    sudo apt-get update
+                    sudo apt-get install -y ansible python3-pip
+                  displayName: Install Ansible
+
+                - bash: |
+                    set -euo pipefail
+                    export ANSIBLE_HOST_KEY_CHECKING=False
+                    export ANSIBLE_CONFIG="$(Build.SourcesDirectory)/$(ANSIBLE_WORKING_DIR)/ansible.cfg"
+
+                    EXTRA_VARS=(
+                      "was_jar_src=$(Build.SourcesDirectory)/$(WAS_JAR_PATH)"
+                      "app_jar_src=$(Build.SourcesDirectory)/$(APP_JAR_PATH)"
+                      "integration_jar_src=$(Build.SourcesDirectory)/$(INTEGRATION_JAR_PATH)"
+                      "web_html_zip_src=$(Build.SourcesDirectory)/$(WEB_HTML_ZIP_PATH)"
+                      "db_password=$(DB_APP_PASSWORD)"
+                      "db_root_password=$(DB_ROOT_PASSWORD)"
+                    )
+
+                    if [ "${{ parameters.deployTarget }}" = "all" ]; then
+                      ansible-playbook -i "$(ANSIBLE_INVENTORY_OUT)" "$(Build.SourcesDirectory)/$(ANSIBLE_WORKING_DIR)/site.yml" --extra-vars "${EXTRA_VARS[*]}"
+                    else
+                      ansible-playbook -i "$(ANSIBLE_INVENTORY_OUT)" "$(Build.SourcesDirectory)/$(ANSIBLE_WORKING_DIR)/site.yml" --limit "${{ parameters.deployTarget }}" --extra-vars "${EXTRA_VARS[*]}"
+                    fi
+                  displayName: Run Ansible site playbook
+
+  - stage: GateDbMigration
+    displayName: Manual Gate - PROD DB Migration
+    dependsOn: AnsibleDeploy
+    condition: and(succeeded(), eq('${{ parameters.runDbMigrations }}', true))
+    jobs:
+      - job: WaitDbApproval
+        pool: server
+        steps:
+          - task: ManualValidation@0
+            timeoutInMinutes: 1440
+            inputs:
+              notifyUsers: $(APPROVER_EMAILS)
+              instructions: 'PROD DB 마이그레이션 진행 승인 후 Resume 하세요.'
+              onTimeout: reject
+
+  - stage: DbMigration
+    displayName: PROD Ordered DB Migrations
+    dependsOn:
+      - AnsibleDeploy
+      - GateDbMigration
+    condition: and(succeeded(), eq('${{ parameters.runDbMigrations }}', true))
+    jobs:
+      - deployment: DbMigrateProd
+        displayName: Apply DB migrations (PROD)
+        environment: $(ENVIRONMENT_NAME_DB)
+        strategy:
+          runOnce:
+            deploy:
+              pool:
+                vmImage: ubuntu-latest
+              steps:
+                - checkout: self
+
+                - task: DownloadPipelineArtifact@2
+                  displayName: Download generated inventory
+                  inputs:
+                    artifact: ansible-inventory-prod
+                    path: $(Pipeline.Workspace)/downloaded-inventory
+
+                - task: InstallSSHKey@0
+                  displayName: Install SSH private key
+                  inputs:
+                    knownHostsEntry: ''
+                    sshPublicKey: ''
+                    sshKeySecureFile: $(ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE)
+
+                - bash: |
+                    set -euo pipefail
+                    sudo apt-get update
+                    sudo apt-get install -y ansible
+                    export ANSIBLE_HOST_KEY_CHECKING=False
+                    export ANSIBLE_CONFIG="$(Build.SourcesDirectory)/$(ANSIBLE_WORKING_DIR)/ansible.cfg"
+
+                    ansible-playbook \
+                      -i "$(Pipeline.Workspace)/downloaded-inventory/inventory.generated.ini" \
+                        "$(Build.SourcesDirectory)/devops/ansible/deploy-db-migrations.yml" \
+                      --extra-vars "db_migrations_root=${{ parameters.dbMigrationsRoot }} db_root_password=$(DB_ROOT_PASSWORD) db_enable_rollback_hook=${{ parameters.enableRollbackHook }} db_rollback_notify_enabled=$(DB_ROLLBACK_NOTIFY_ENABLED) db_rollback_notify_webhook_url=$(DB_ROLLBACK_NOTIFY_WEBHOOK_URL) db_rollback_notify_channel=$(DB_ROLLBACK_NOTIFY_CHANNEL) db_rollback_notify_context=prod"
+                  displayName: Run ordered DB migration playbook

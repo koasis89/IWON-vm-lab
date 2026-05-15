@@ -1,0 +1,1034 @@
+<!DOCTYPE html><html><head>
+      <title>gitops구성방안</title>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      
+      <link rel="stylesheet" href="file:///c:\Users\koasi\.vscode\extensions\shd101wyy.markdown-preview-enhanced-0.8.22\crossnote\dependencies\katex\katex.min.css">
+      
+      
+      <script type="text/javascript" src="file:///c:\Users\koasi\.vscode\extensions\shd101wyy.markdown-preview-enhanced-0.8.22\crossnote\dependencies\mermaid\mermaid.min.js" charset="UTF-8"></script>
+      
+      
+      <style>
+      code[class*=language-],pre[class*=language-]{color:#333;background:0 0;font-family:Consolas,"Liberation Mono",Menlo,Courier,monospace;text-align:left;white-space:pre;word-spacing:normal;word-break:normal;word-wrap:normal;line-height:1.4;-moz-tab-size:8;-o-tab-size:8;tab-size:8;-webkit-hyphens:none;-moz-hyphens:none;-ms-hyphens:none;hyphens:none}pre[class*=language-]{padding:.8em;overflow:auto;border-radius:3px;background:#f5f5f5}:not(pre)>code[class*=language-]{padding:.1em;border-radius:.3em;white-space:normal;background:#f5f5f5}.token.blockquote,.token.comment{color:#969896}.token.cdata{color:#183691}.token.doctype,.token.macro.property,.token.punctuation,.token.variable{color:#333}.token.builtin,.token.important,.token.keyword,.token.operator,.token.rule{color:#a71d5d}.token.attr-value,.token.regex,.token.string,.token.url{color:#183691}.token.atrule,.token.boolean,.token.code,.token.command,.token.constant,.token.entity,.token.number,.token.property,.token.symbol{color:#0086b3}.token.prolog,.token.selector,.token.tag{color:#63a35c}.token.attr-name,.token.class,.token.class-name,.token.function,.token.id,.token.namespace,.token.pseudo-class,.token.pseudo-element,.token.url-reference .token.variable{color:#795da3}.token.entity{cursor:help}.token.title,.token.title .token.punctuation{font-weight:700;color:#1d3e81}.token.list{color:#ed6a43}.token.inserted{background-color:#eaffea;color:#55a532}.token.deleted{background-color:#ffecec;color:#bd2c00}.token.bold{font-weight:700}.token.italic{font-style:italic}.language-json .token.property{color:#183691}.language-markup .token.tag .token.punctuation{color:#333}.language-css .token.function,code.language-css{color:#0086b3}.language-yaml .token.atrule{color:#63a35c}code.language-yaml{color:#183691}.language-ruby .token.function{color:#333}.language-markdown .token.url{color:#795da3}.language-makefile .token.symbol{color:#795da3}.language-makefile .token.variable{color:#183691}.language-makefile .token.builtin{color:#0086b3}.language-bash .token.keyword{color:#0086b3}pre[data-line]{position:relative;padding:1em 0 1em 3em}pre[data-line] .line-highlight-wrapper{position:absolute;top:0;left:0;background-color:transparent;display:block;width:100%}pre[data-line] .line-highlight{position:absolute;left:0;right:0;padding:inherit 0;margin-top:1em;background:hsla(24,20%,50%,.08);background:linear-gradient(to right,hsla(24,20%,50%,.1) 70%,hsla(24,20%,50%,0));pointer-events:none;line-height:inherit;white-space:pre}pre[data-line] .line-highlight:before,pre[data-line] .line-highlight[data-end]:after{content:attr(data-start);position:absolute;top:.4em;left:.6em;min-width:1em;padding:0 .5em;background-color:hsla(24,20%,50%,.4);color:#f4f1ef;font:bold 65%/1.5 sans-serif;text-align:center;vertical-align:.3em;border-radius:999px;text-shadow:none;box-shadow:0 1px #fff}pre[data-line] .line-highlight[data-end]:after{content:attr(data-end);top:auto;bottom:.4em}html body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,freesans,sans-serif;font-size:16px;line-height:1.6;color:#333;background-color:#fff;overflow:initial;box-sizing:border-box;word-wrap:break-word}html body>:first-child{margin-top:0}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{line-height:1.2;margin-top:1em;margin-bottom:16px;color:#000}html body h1{font-size:2.25em;font-weight:300;padding-bottom:.3em}html body h2{font-size:1.75em;font-weight:400;padding-bottom:.3em}html body h3{font-size:1.5em;font-weight:500}html body h4{font-size:1.25em;font-weight:600}html body h5{font-size:1.1em;font-weight:600}html body h6{font-size:1em;font-weight:600}html body h1,html body h2,html body h3,html body h4,html body h5{font-weight:600}html body h5{font-size:1em}html body h6{color:#5c5c5c}html body strong{color:#000}html body del{color:#5c5c5c}html body a:not([href]){color:inherit;text-decoration:none}html body a{color:#08c;text-decoration:none}html body a:hover{color:#00a3f5;text-decoration:none}html body img{max-width:100%}html body>p{margin-top:0;margin-bottom:16px;word-wrap:break-word}html body>ol,html body>ul{margin-bottom:16px}html body ol,html body ul{padding-left:2em}html body ol.no-list,html body ul.no-list{padding:0;list-style-type:none}html body ol ol,html body ol ul,html body ul ol,html body ul ul{margin-top:0;margin-bottom:0}html body li{margin-bottom:0}html body li.task-list-item{list-style:none}html body li>p{margin-top:0;margin-bottom:0}html body .task-list-item-checkbox{margin:0 .2em .25em -1.8em;vertical-align:middle}html body .task-list-item-checkbox:hover{cursor:pointer}html body blockquote{margin:16px 0;font-size:inherit;padding:0 15px;color:#5c5c5c;background-color:#f0f0f0;border-left:4px solid #d6d6d6}html body blockquote>:first-child{margin-top:0}html body blockquote>:last-child{margin-bottom:0}html body hr{height:4px;margin:32px 0;background-color:#d6d6d6;border:0 none}html body table{margin:10px 0 15px 0;border-collapse:collapse;border-spacing:0;display:block;width:100%;overflow:auto;word-break:normal;word-break:keep-all}html body table th{font-weight:700;color:#000}html body table td,html body table th{border:1px solid #d6d6d6;padding:6px 13px}html body dl{padding:0}html body dl dt{padding:0;margin-top:16px;font-size:1em;font-style:italic;font-weight:700}html body dl dd{padding:0 16px;margin-bottom:16px}html body code{font-family:Menlo,Monaco,Consolas,'Courier New',monospace;font-size:.85em;color:#000;background-color:#f0f0f0;border-radius:3px;padding:.2em 0}html body code::after,html body code::before{letter-spacing:-.2em;content:'\00a0'}html body pre>code{padding:0;margin:0;word-break:normal;white-space:pre;background:0 0;border:0}html body .highlight{margin-bottom:16px}html body .highlight pre,html body pre{padding:1em;overflow:auto;line-height:1.45;border:#d6d6d6;border-radius:3px}html body .highlight pre{margin-bottom:0;word-break:normal}html body pre code,html body pre tt{display:inline;max-width:initial;padding:0;margin:0;overflow:initial;line-height:inherit;word-wrap:normal;background-color:transparent;border:0}html body pre code:after,html body pre code:before,html body pre tt:after,html body pre tt:before{content:normal}html body blockquote,html body dl,html body ol,html body p,html body pre,html body ul{margin-top:0;margin-bottom:16px}html body kbd{color:#000;border:1px solid #d6d6d6;border-bottom:2px solid #c7c7c7;padding:2px 4px;background-color:#f0f0f0;border-radius:3px}@media print{html body{background-color:#fff}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{color:#000;page-break-after:avoid}html body blockquote{color:#5c5c5c}html body pre{page-break-inside:avoid}html body table{display:table}html body img{display:block;max-width:100%;max-height:100%}html body code,html body pre{word-wrap:break-word;white-space:pre}}.markdown-preview{width:100%;height:100%;box-sizing:border-box}.markdown-preview ul{list-style:disc}.markdown-preview ul ul{list-style:circle}.markdown-preview ul ul ul{list-style:square}.markdown-preview ol{list-style:decimal}.markdown-preview ol ol,.markdown-preview ul ol{list-style-type:lower-roman}.markdown-preview ol ol ol,.markdown-preview ol ul ol,.markdown-preview ul ol ol,.markdown-preview ul ul ol{list-style-type:lower-alpha}.markdown-preview .newpage,.markdown-preview .pagebreak{page-break-before:always}.markdown-preview pre.line-numbers{position:relative;padding-left:3.8em;counter-reset:linenumber}.markdown-preview pre.line-numbers>code{position:relative}.markdown-preview pre.line-numbers .line-numbers-rows{position:absolute;pointer-events:none;top:1em;font-size:100%;left:0;width:3em;letter-spacing:-1px;border-right:1px solid #999;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.markdown-preview pre.line-numbers .line-numbers-rows>span{pointer-events:none;display:block;counter-increment:linenumber}.markdown-preview pre.line-numbers .line-numbers-rows>span:before{content:counter(linenumber);color:#999;display:block;padding-right:.8em;text-align:right}.markdown-preview .mathjax-exps .MathJax_Display{text-align:center!important}.markdown-preview:not([data-for=preview]) .code-chunk .code-chunk-btn-group{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .status{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .output-div{margin-bottom:16px}.markdown-preview .md-toc{padding:0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link div,.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}.markdown-preview .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}.scrollbar-style::-webkit-scrollbar{width:8px}.scrollbar-style::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}.scrollbar-style::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode]){position:relative;width:100%;height:100%;top:0;left:0;margin:0;padding:0;overflow:auto}html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{position:relative;top:0;min-height:100vh}@media screen and (min-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em calc(50% - 457px + 2em)}}@media screen and (max-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{font-size:14px!important;padding:1em}}@media print{html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{display:none}}html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{position:fixed;bottom:8px;left:8px;font-size:28px;cursor:pointer;color:inherit;z-index:99;width:32px;text-align:center;opacity:.4}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] #sidebar-toc-btn{opacity:1}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc{position:fixed;top:0;left:0;width:300px;height:100%;padding:32px 0 48px 0;font-size:14px;box-shadow:0 0 4px rgba(150,150,150,.33);box-sizing:border-box;overflow:auto;background-color:inherit}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar{width:8px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc a{text-decoration:none}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc{padding:0 16px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link div,html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{left:300px;width:calc(100% - 300px);padding:2em calc(50% - 457px - 300px / 2);margin:0;box-sizing:border-box}@media screen and (max-width:1274px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{width:100%}}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .markdown-preview{left:50%;transform:translateX(-50%)}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .md-sidebar-toc{display:none}
+/* Please visit the URL below for more information: */
+/*   https://shd101wyy.github.io/markdown-preview-enhanced/#/customize-css */
+
+      </style>
+      <script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+    </head>
+    <body for="html-export">
+      <div class="crossnote markdown-preview  ">
+      
+<h1 id="github--azure-devops-하이브리드-cicd-구성-방안">GitHub &amp; Azure DevOps 하이브리드 CI/CD 구성 방안 </h1>
+<p>본 문서는 GitHub를 소스 저장소(CI)로 사용하고 Azure DevOps를 배포 엔진(CD)으로 활용하는 하이브리드 구성 방안을 정리합니다.<br>
+현재 기준 저장소 구조는 Web/WAS가 단일 저장소(IWonPaymentWeb) 내 폴더로 분리되어 있고, App/Integration은 별도 저장소로 운영됩니다.</p>
+<hr>
+<h2 id="0-본-문서의-적용-범위-poc-예외-포함">0. 본 문서의 적용 범위 (PoC 예외 포함) </h2>
+<p>현재 단계는 PoC이므로 아래 2개 항목은 의도적으로 예외 처리합니다.</p>
+<ul>
+<li>예외 1: CI에서 테스트를 생략하고 빠른 배포를 허용한다.</li>
+<li>예외 2: 보안 권한 범위(예: PAT, Secure File 접근)는 PoC 속도를 위해 운영 기준보다 완화할 수 있다.</li>
+</ul>
+<p>위 2개를 제외한 나머지(버전 전략, 배포 분리, 아티팩트 검증, 환경 승인 정책, 문서 정합성)는 본 문서에서 운영 적용 가능한 수준으로 보완합니다.</p>
+<hr>
+<h2 id="1-전체-아키텍처-architecture">1. 전체 아키텍처 (Architecture) </h2>
+<p>시스템별 책임이 분리되어 있으므로, 소스 빌드 및 업로드(GitHub)와 인프라 배포/애플리케이션 배포(Azure DevOps)의 역할을 분리하는 것이 핵심입니다.</p>
+<ul>
+<li>GitHub(CI): IWonPaymentWeb 저장소의 web/was 폴더, IWonPaymentApp 저장소, IWonPaymentIntegration 저장소에서 소스를 빌드하고 결과물(JAR/Zip)을 Azure Artifacts로 업로드합니다.</li>
+<li>Azure DevOps(CD): 파이프라인을 인프라(Terraform)와 애플리케이션(Ansible) 단계로 분리해 실행합니다.</li>
+</ul>
+<h3 id="10-git-ops-개념도">1.0 Git Ops 개념도 </h3>
+<p>Git Ops 개념도는 <strong>개발자PC → GitHub Repo → GitHub Actions → GitHub 퍼블리싱 VM → Azure DevOps(Project / Pipeline / Artifacts) → bastion VM(self-hosted ADO agent) → 대상 VM</strong> 간의 구성 관계를 보여준다.</p>
+<div class="mermaid">flowchart TD
+  subgraph DEV[개발자]
+    A[개발자 PC&lt;br/&gt;소스 수정 / commit / push]
+  end
+  
+  subgraph ARCHITECT[운영, 배포 아키텍트]
+    CA[아키텍트 PC&lt;br/&gt;Terraform/Ansible/YAML &lt;br/&gt;작성 및 관리]
+  end
+  
+  subgraph GITOPS[GitHub 배포 정의 영역]
+    direction TB
+    H[GitOps Repo&lt;br/&gt;IWON-vm-lab&lt;br/&gt;Terraform / Ansible / YAML]
+  end
+
+  subgraph GH[GitHub 영역]
+    direction LR
+    B[GitHub Repo&lt;br/&gt;IWonPaymentWeb / App / Integration]
+    C[GitHub Actions&lt;br/&gt;build / version / publish / deploy trigger]
+    D[GitHub 퍼블리싱 VM&lt;br/&gt;self-hosted runner 또는 publish 실행 VM]
+  end
+
+  subgraph ADO[Azure DevOps 영역]
+    direction TB
+    E[Azure DevOps Project&lt;br/&gt;iwon-smart-ops]
+    G[Azure Pipeline&lt;br/&gt;iwon-vm-cd]
+    F[Azure Artifacts&lt;br/&gt;smart-web / smart-was / smart-app / smart-integration]
+  end
+
+  subgraph TARGET[배포 대상 / 실행 VM]
+    direction TD
+    J[bastion VM&lt;br/&gt;bastion01&lt;br/&gt; Azure-DevOps-agent]
+    W1[web VM&lt;br/&gt;web01 / nginx]
+    W2[was VM&lt;br/&gt;was01 / was.service]
+    W3[app VM&lt;br/&gt;app01 / app.service]
+    W4[integration VM&lt;br/&gt;smartcontract01 / integration.service]
+  end
+
+  CA --&gt;|git commit / push| H
+  A --&gt;|git push / PR| B
+  B --&gt;|workflow trigger| C
+  C --&gt;|runner 실행| D
+  D --&gt;|artifact publish| F
+  D --&gt;|REST API 호출| G
+  H --&gt;|gitops YAML checkout| E
+  G --&gt;|feed artifact download| F
+  F --&gt;|Pipeline에서\njob 실행 / agent 할당| J
+  J --&gt;|Ansible / SSH jump| W1
+  J --&gt;|Ansible / SSH jump| W2
+  J --&gt;|Ansible / SSH jump| W3
+  J --&gt;|Ansible / SSH jump| W4
+  E --- G
+  E --- F
+
+  style DEV fill:#eef7f1,stroke:#2f6b45,color:#173524 ARCHITECT
+  style ARCHITECT fill:#eef7f1,stroke:#2f6b45,color:#173524
+  style GH fill:#eef3fb,stroke:#275ea3,color:#17345c
+  style ADO fill:#fff6e8,stroke:#a66a00,color:#4d3200
+  style GITOPS fill:#f9eef7,stroke:#8f3c7a,color:#4a193f
+  style TARGET fill:#f3f8ff,stroke:#3b82f6,color:#17345c
+</div><h4 id="설명">설명 </h4>
+<p>위 개념도는 <strong>소스 변경(CI)</strong> 과 <strong>운영 배포(CD)</strong> 의 책임을 분리한 구조를 보여준다.</p>
+<ol>
+<li><strong>개발자 PC</strong> 는 <code>IWonPaymentWeb</code>, <code>IWonPaymentApp</code>, <code>IWonPaymentIntegration</code> 같은 소스 저장소에만 코드를 반영한다.</li>
+<li><strong>GitHub Actions / 퍼블리싱 VM</strong> 은 소스를 빌드하고 버전을 부여한 뒤, 결과물(<code>jar</code>, <code>zip</code>)을 <strong>Azure Artifacts Feed</strong> 에 업로드한다.</li>
+<li><strong>아키텍트 PC</strong> 는 <code>IWON-vm-lab</code> GitOps 저장소에서 <code>Terraform</code>, <code>Ansible</code>, <code>Azure Pipeline YAML</code> 을 관리하며, 배포 방식과 인프라 정의를 통제한다.</li>
+<li><strong>Azure DevOps Pipeline</strong> 은 GitOps 저장소의 배포 정의를 읽고, Feed 에 올라온 산출물을 기준으로 CD를 수행한다.</li>
+<li>실제 배포 작업은 <strong>bastion01</strong> 에 설치된 <strong>self-hosted Azure DevOps agent</strong> 가 수행하며, 이 bastion VM이 각 대상 VM(<code>web01</code>, <code>was01</code>, <code>app01</code>, <code>smartcontract01</code>)으로 SSH/Ansible 배포를 중계한다.</li>
+</ol>
+<p>즉, 이 구조의 핵심은 <strong>GitHub는 빌드와 publish 담당</strong>, <strong>GitOps 저장소는 배포 기준 관리</strong>, <strong>Azure DevOps + bastion agent는 실제 운영 배포 실행</strong> 역할을 맡는다는 점이다.</p>
+<h3 id="11-전체-흐름도">1.1 전체 흐름도 </h3>
+<p>개발자 리포지토리에는 애플리케이션 소스만 두고, 배포 정의(YAML/Ansible/Terraform)는 gitops 리포지토리에서 중앙 관리합니다.</p>
+<div class="mermaid">flowchart TD
+  subgraph CI[CI 영역]
+    direction TD
+    A[1. 개발자 GitHub Repository&lt;br/&gt;- IWonPaymentWeb&lt;br/&gt;- IWonPaymentApp&lt;br/&gt;- IWonPaymentIntegration]
+    B[2. GitHub Actions&lt;br/&gt;- 소스 checkout&lt;br/&gt;- build&lt;br/&gt;- 버전 계산&lt;br/&gt;- Azure Artifacts Feed 업로드]
+  end
+
+  subgraph ART[Artifact 저장 영역]
+    direction TD
+    C[3. Azure Artifacts Feed&lt;br/&gt;- smart-web zip&lt;br/&gt;- smart-was jar&lt;br/&gt;- smart-app jar&lt;br/&gt;- smart-integration jar]
+  end
+
+  subgraph CD[CD / GitOps 영역]
+    direction TD
+    D[4. gitops Repository&lt;br/&gt;- Azure Pipeline YAML&lt;br/&gt;- Terraform&lt;br/&gt;- Ansible wrapper playbook&lt;br/&gt;- deployTarget별 task 파일]
+    E[5. Azure DevOps Pipeline&lt;br/&gt;- gitops 저장소 checkout&lt;br/&gt;- Terraform output 조회/생성&lt;br/&gt;- Artifact download&lt;br/&gt;- wrapper playbook 실행]
+    F[6. Target VM&lt;br/&gt;- web: zip 배포 + nginx reload&lt;br/&gt;- was/app/integration: jar 배포 + systemd restart]
+  end
+
+  subgraph CTRL[운영 제어 포인트]
+    direction TD
+    P[PoC 모드&lt;br/&gt;- 자동 승인&lt;br/&gt;- 빠른 검증 목적]
+    O[운영 모드&lt;br/&gt;- Environment 승인 가능&lt;br/&gt;- 수동 검토/승인]
+  end
+
+  A --&gt;|자동 1: main 머지 / GitHub Actions CI| B
+  B --&gt;|자동 2: 패키지 publish| C
+  C --&gt;|자동 3: Azure DevOps CD 실행| D
+  D --&gt;|자동 4: gitops 기준 파이프라인 실행| E
+  E --&gt;|자동 5: wrapper playbook 배포| F
+  P -. PoC 기본값 .-&gt; E
+  O -. 운영 시 승인 지점 .-&gt; E
+
+  style CI fill:#eef7f1,stroke:#2f6b45,stroke-width:1px,color:#173524
+  style ART fill:#fff6e8,stroke:#a66a00,stroke-width:1px,color:#4d3200
+  style CD fill:#eef3fb,stroke:#275ea3,stroke-width:1px,color:#17345c
+  style CTRL fill:#f9eef7,stroke:#8f3c7a,stroke-width:1px,color:#4a193f
+
+  classDef ciNode fill:#f7fbf8,stroke:#2f6b45,color:#173524
+  classDef artifactNode fill:#fffaf2,stroke:#a66a00,color:#4d3200
+  classDef cdNode fill:#f7faff,stroke:#275ea3,color:#17345c
+  classDef controlNode fill:#fff7fd,stroke:#8f3c7a,color:#4a193f,stroke-dasharray: 4 2
+
+  class A,B ciNode
+  class C artifactNode
+  class D,E,F cdNode
+  class P,O controlNode
+</div><h3 id="111-현재-진행-위치-2026-04-03-기준">1.1.1 현재 진행 위치 (2026-04-03 기준) </h3>
+<p>현재는 <strong>1.1 흐름도 기준으로 <code>C(Feed)</code> ~ <code>E(Azure DevOps Pipeline)</code> 사이를 검증한 상태</strong>입니다.<br>
+즉, ADO 배포 엔진은 대부분 살아 있으나, <strong>GitHub source repo에서 Feed로 publish 되는 선행 단계가 아직 완성되지 않아 <code>B -&gt; C</code> 연결이 비어 있는 상태</strong>입니다.</p>
+<table>
+<thead>
+<tr>
+<th>흐름 단계</th>
+<th>현재 상태</th>
+<th>소관 영역</th>
+<th>판단</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. 개발자 GitHub Repository</td>
+<td>미확정/미착수</td>
+<td>GitHub source repo</td>
+<td><code>build.gradle</code>, workflow, secrets 확인 필요</td>
+</tr>
+<tr>
+<td>2. GitHub Actions build/publish</td>
+<td>미완료</td>
+<td>GitHub source repo</td>
+<td>아직 실제 패키지 publish 확인 안 됨</td>
+</tr>
+<tr>
+<td>3. Azure Artifacts Feed</td>
+<td>부분완료</td>
+<td>Azure DevOps Portal</td>
+<td>Feed 존재/권한 확인 완료, 패키지는 비어 있음</td>
+</tr>
+<tr>
+<td>4. gitops Repository</td>
+<td>완료</td>
+<td><code>IWON-vm-lab</code></td>
+<td>YAML/Ansible/Terraform 보유</td>
+</tr>
+<tr>
+<td>5. Azure DevOps Pipeline</td>
+<td>부분완료</td>
+<td>Azure DevOps Portal + gitops repo</td>
+<td>run/queue/SSH/precheck 검증 완료</td>
+</tr>
+<tr>
+<td>6. Target VM 배포</td>
+<td>미도달</td>
+<td>VM/Ansible</td>
+<td>artifact 미게시로 아직 도달 못함</td>
+</tr>
+</tbody>
+</table>
+<h3 id="112-저장소-역할-혼동-방지-메모">1.1.2 저장소 역할 혼동 방지 메모 </h3>
+<ul>
+<li><code>IWON-vm-lab</code>은 <strong>gitops/CD 저장소</strong>다. 따라서 여기에 <code>build.gradle</code>이 없는 것은 정상이다.</li>
+<li><code>IWonPaymentWeb</code>, <code>IWonPaymentApp</code>, <code>IWonPaymentIntegration</code>은 <strong>소스/CI 저장소</strong>다. <code>build.gradle</code>, GitHub Actions, 패키지 publish 설정은 이 저장소들에서 작업해야 한다.</li>
+<li>따라서 <code>Package not found in feed</code> 류 이슈는 보통 <strong>ADO Portal 자체 문제라기보다 source repo의 build/publish 미완료</strong>에서 발생한다.</li>
+</ul>
+<h3 id="12-저장소-역할-분담">1.2 저장소 역할 분담 </h3>
+<ol>
+<li>개발자 리포지토리</li>
+</ol>
+<ul>
+<li>역할: 애플리케이션 소스 관리, 빌드, 패키징</li>
+<li>포함 파일: application source, build.gradle, GitHub Actions workflow</li>
+<li>비포함 원칙: 운영 배포용 Ansible/Terraform/YAML</li>
+<li>구조 메모: IWonPaymentWeb는 단일 저장소 내 web/was 폴더를 각각 독립 배포 단위로 관리</li>
+</ul>
+<ol start="2">
+<li>Artifacts Feed</li>
+</ol>
+<ul>
+<li>역할: 빌드 산출물의 버전 저장소</li>
+<li>Azure DevOps CD는 GitHub 소스를 직접 배포하지 않고, Feed에 올라온 버전 산출물을 기준으로 배포</li>
+</ul>
+<ol start="3">
+<li>gitops 리포지토리</li>
+</ol>
+<ul>
+<li>역할: 배포 정의 중앙 관리</li>
+<li>포함 파일: Azure DevOps 파이프라인, Terraform, inventory 생성 스크립트, Ansible wrapper/task</li>
+<li>실제 배포 기준 파일:
+<ul>
+<li>gitops/ansible/azure-pipelines-vm.yml</li>
+<li>gitops/ansible/deploy-playbook.yml</li>
+<li>gitops/ansible/tasks/deploy-web.yml</li>
+<li>gitops/ansible/tasks/deploy-was.yml</li>
+<li>gitops/ansible/tasks/deploy-app.yml</li>
+<li>gitops/ansible/tasks/deploy-integration.yml</li>
+</ul>
+</li>
+</ul>
+<h3 id="13-webwasappintegration-타깃-맵">1.3 web/was/app/integration 타깃 맵 </h3>
+<p><code>gitops</code>는 이미 4개 배포 타깃 기준으로 구성되어 있으며, Azure DevOps의 <code>deployTarget</code> 값으로 분기된다.</p>
+<table>
+<thead>
+<tr>
+<th>타깃</th>
+<th><code>deployTarget</code></th>
+<th>배포 task</th>
+<th>역할</th>
+<th>원격 반영 위치</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Web</td>
+<td><code>web</code></td>
+<td><code>gitops/ansible/tasks/deploy-web.yml</code></td>
+<td>정적 파일 + nginx</td>
+<td>web01 / nginx</td>
+</tr>
+<tr>
+<td>WAS</td>
+<td><code>was</code></td>
+<td><code>gitops/ansible/tasks/deploy-was.yml</code></td>
+<td>Spring Boot JAR</td>
+<td>was01 / <code>was.service</code></td>
+</tr>
+<tr>
+<td>App</td>
+<td><code>app</code></td>
+<td><code>gitops/ansible/tasks/deploy-app.yml</code></td>
+<td>Spring Boot JAR</td>
+<td>app01 / <code>app.service</code></td>
+</tr>
+<tr>
+<td>Integration</td>
+<td><code>integration</code></td>
+<td><code>gitops/ansible/tasks/deploy-integration.yml</code></td>
+<td>JAR + Kafka 변수</td>
+<td>smartcontract01 / <code>integration.service</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="14-개발자-관점-안전-원칙">1.4 개발자 관점 안전 원칙 </h3>
+<ul>
+<li>소스 저장소는 <strong>빌드와 버전 관리</strong>, <code>gitops</code> 저장소는 <strong>배포 정의 관리</strong>만 맡는다.</li>
+<li>PoC 산출물은 운영 공용 서비스명(<code>was.service</code> 등)에 바로 투입하지 않는다.</li>
+<li>배포 전에는 항상 아래 3가지를 명시한다.
+<ol>
+<li><code>deployTarget</code></li>
+<li><code>mavenPackageDefinition</code></li>
+<li><code>mavenPackageVersion</code></li>
+</ol>
+</li>
+<li>운영 배포는 <code>main</code> 직접 실험 대신 <strong>검증 브랜치 → 승인 → 반영</strong> 순서로 진행한다.</li>
+</ul>
+<hr>
+<h2 id="2-github-ci-설정-소스-빌드-및-artifact-발행">2. GitHub CI 설정 (소스 빌드 및 Artifact 발행) </h2>
+<h3 id="21-개발-환경-및-빌드-원칙">2.1 개발 환경 및 빌드 원칙 </h3>
+<ul>
+<li>Cloud Build 방식: 개발자의 로컬(VS Code) 환경이 아닌 GitHub Runner에서 빌드를 수행합니다.</li>
+<li>이유: 환경 일관성 유지(Java 버전 통일), 로컬 설정 유입 차단, 휴먼 에러 방지.</li>
+</ul>
+<blockquote>
+<p>현재 1차 PoC는 운영 저장소를 직접 수정하지 않고, 별도 저장소 <code>iwon-poc</code> (<code>C:\Workspace\iwon-poc\iwon-poc</code>, <code>https://github.com/ITeyes-IWon/iwon-poc.git</code>) 기준으로 진행합니다.<br>
+이 PoC의 고정값은 <code>artifactId/archiveBaseName = iwon-poc</code>, <code>deployTarget = was</code>, 대상 VM = <code>was01</code> 입니다.</p>
+</blockquote>
+<h3 id="22-gradle-설정-buildgradle">2.2 Gradle 설정 (build.gradle) </h3>
+<p>빌드 결과물을 Azure Artifacts(Maven Feed)로 전송하기 위해 maven-publish 설정을 추가합니다.</p>
+<p>핵심 원칙은 최신(latest)/SNAPSHOT 의존을 줄이고, 커밋/빌드번호 기반의 고정 버전을 발행하는 것입니다.</p>
+<pre data-role="codeBlock" data-info="gradle" class="language-gradle gradle"><code>publishing <span class="token punctuation">{</span>
+    publications <span class="token punctuation">{</span>
+        <span class="token function">mavenJava</span><span class="token punctuation">(</span>MavenPublication<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            from components<span class="token punctuation">.</span>java
+            groupId <span class="token operator">=</span> <span class="token string">'com.iteyes.smart'</span>
+            artifactId <span class="token operator">=</span> <span class="token keyword keyword-project">project</span><span class="token punctuation">.</span>name <span class="token comment">// 예: smart-was, smart-web</span>
+            version <span class="token operator">=</span> System<span class="token punctuation">.</span><span class="token function">getenv</span><span class="token punctuation">(</span><span class="token interpolation-string"><span class="token string">"APP_VERSION"</span></span><span class="token punctuation">)</span> <span class="token operator">?:</span> <span class="token interpolation-string"><span class="token string">"0.0.0-local"</span></span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword keyword-repositories">repositories</span> <span class="token punctuation">{</span>
+        maven <span class="token punctuation">{</span>
+            url <span class="token string">'https://pkgs.dev.azure.com/{Org}/{Project}/_packaging/{Feed}/maven/v1'</span>
+            credentials <span class="token punctuation">{</span>
+                username <span class="token operator">=</span> <span class="token interpolation-string"><span class="token string">"AZURE_DEVOPS_PAT"</span></span>
+                password <span class="token operator">=</span> System<span class="token punctuation">.</span><span class="token function">getenv</span><span class="token punctuation">(</span><span class="token interpolation-string"><span class="token string">"AZURE_ARTIFACTS_ENV_ACCESS_TOKEN"</span></span><span class="token punctuation">)</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+</code></pre><p>권장 버전 예시:</p>
+<ul>
+<li>1.4.2+build.381</li>
+<li>1.4.2-main.7c2d9a1</li>
+</ul>
+<h3 id="23-github-actions-워크플로우-githubworkflowsci-cdyml">2.3 GitHub Actions 워크플로우 (.github/workflows/ci-cd.yml) </h3>
+<p>main 브랜치 반영 시 자동 실행되어 배포 단위별 산출물을 생성 후 Azure Artifacts에 업로드합니다.</p>
+<p>Web/WAS는 하나의 저장소(IWonPaymentWeb) 안에서 폴더가 분리되어 있으므로, 자동배포 시작 파일도 폴더 기준으로 2개를 둡니다.</p>
+<ul>
+<li>deploy-web.yml: IWonPaymentWeb/web 폴더 변경 시 web 산출물 생성 및 web 배포 호출</li>
+<li>deploy-was.yml: IWonPaymentWeb/was 폴더 변경 시 was 산출물 생성 및 was 배포 호출</li>
+<li>App/Integration은 기존처럼 저장소별 1개 파일 구성</li>
+</ul>
+<pre data-role="codeBlock" data-info="yaml" class="language-yaml yaml"><code><span class="token key atrule">name</span><span class="token punctuation">:</span> Java CI with Gradle and Publish to Azure Artifacts
+
+<span class="token key atrule">on</span><span class="token punctuation">:</span>
+  <span class="token key atrule">push</span><span class="token punctuation">:</span>
+    <span class="token key atrule">branches</span><span class="token punctuation">:</span> <span class="token punctuation">[</span> <span class="token string">"main"</span> <span class="token punctuation">]</span>
+
+<span class="token key atrule">jobs</span><span class="token punctuation">:</span>
+  <span class="token key atrule">build-and-publish</span><span class="token punctuation">:</span>
+    <span class="token key atrule">runs-on</span><span class="token punctuation">:</span> ubuntu<span class="token punctuation">-</span>latest
+    <span class="token key atrule">permissions</span><span class="token punctuation">:</span>
+      <span class="token key atrule">contents</span><span class="token punctuation">:</span> read
+
+    <span class="token key atrule">steps</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Checkout Source Code
+      <span class="token key atrule">uses</span><span class="token punctuation">:</span> actions/checkout@v4
+
+    <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Set up JDK 17
+      <span class="token key atrule">uses</span><span class="token punctuation">:</span> actions/setup<span class="token punctuation">-</span>java@v4
+      <span class="token key atrule">with</span><span class="token punctuation">:</span>
+        <span class="token key atrule">java-version</span><span class="token punctuation">:</span> <span class="token string">'17'</span>
+        <span class="token key atrule">distribution</span><span class="token punctuation">:</span> <span class="token string">'temurin'</span>
+
+    <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Compute immutable version
+      <span class="token key atrule">run</span><span class="token punctuation">:</span> <span class="token punctuation">|</span><span class="token scalar string">
+        SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+        echo "APP_VERSION=1.0.0-main.${SHORT_SHA}" &gt;&gt; $GITHUB_ENV</span>
+
+    <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> <span class="token key atrule">Build with Gradle (PoC</span><span class="token punctuation">:</span> tests skipped intentionally)
+      <span class="token key atrule">run</span><span class="token punctuation">:</span> chmod +x gradlew <span class="token important">&amp;&amp;</span> ./gradlew build <span class="token punctuation">-</span>x test
+
+    <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Publish to Azure Artifacts
+      <span class="token key atrule">run</span><span class="token punctuation">:</span> ./gradlew publish
+      <span class="token key atrule">env</span><span class="token punctuation">:</span>
+        <span class="token key atrule">APP_VERSION</span><span class="token punctuation">:</span> $<span class="token punctuation">{</span><span class="token punctuation">{</span> env.APP_VERSION <span class="token punctuation">}</span><span class="token punctuation">}</span>
+        <span class="token key atrule">AZURE_ARTIFACTS_ENV_ACCESS_TOKEN</span><span class="token punctuation">:</span> $<span class="token punctuation">{</span><span class="token punctuation">{</span> secrets.AZURE_DEVOPS_PAT <span class="token punctuation">}</span><span class="token punctuation">}</span>
+</code></pre><p>보안(PoC): Azure DevOps에서 발급받은 PAT(Personal Access Token)을 GitHub Secrets(AZURE_DEVOPS_PAT)에 등록합니다.</p>
+<h3 id="24-자동배포-연결-방식-확정">2.4 자동배포 연결 방식 확정 </h3>
+<p>현재 <a href="gitops/ansible/azure-pipelines-vm.yml">gitops/ansible/azure-pipelines-vm.yml</a> 은 <code>trigger: none</code> 으로 작성되어 있으므로, 자동배포는 파이프라인 내부가 아니라 외부 CI가 실행을 시작하는 방식으로 연결해야 합니다.</p>
+<p>본 PoC와 현재 구조에서는 아래 1개 방식으로 고정합니다.</p>
+<ul>
+<li>선택 방식: GitHub Actions 빌드/Feed 업로드 완료 후 Azure DevOps Pipeline Runs REST API 호출</li>
+<li>선택 이유 1: 현재 CD 기준 파이프라인은 gitops 저장소에 있고, 배포 입력값도 YAML parameter로 이미 정의되어 있어 외부 호출 연결이 가장 단순함</li>
+<li>선택 이유 2: 실제 배포 기준이 GitHub 소스 변경이 아니라 Feed 업로드 완료 시점이므로, CI 완료 이후 호출이 가장 정합적임</li>
+<li>선택 이유 3: 현재 <a href="gitops/ansible/azure-pipelines-vm.yml">gitops/ansible/azure-pipelines-vm.yml</a> 의 parameter 구조를 그대로 사용할 수 있어 추가 개조가 거의 필요 없음</li>
+</ul>
+<h3 id="25-실제-구현안">2.5 실제 구현안 </h3>
+<p>자동배포 시작 시점은 다음 순서로 고정합니다.</p>
+<ol>
+<li>개발자 리포지토리의 GitHub Actions가 <code>main</code> 머지 후 빌드를 수행한다.</li>
+<li>GitHub Actions가 산출물을 Azure Artifacts Feed에 publish 한다.</li>
+<li>publish 성공 직후 같은 워크플로우에서 Azure DevOps Runs REST API를 호출한다.</li>
+<li>Azure DevOps가 <a href="gitops/ansible/azure-pipelines-vm.yml">gitops/ansible/azure-pipelines-vm.yml</a> 을 실행한다.</li>
+<li>파이프라인은 Feed에서 방금 publish 된 버전을 다운로드하고 Ansible 배포를 수행한다.</li>
+</ol>
+<p>필수 입력값은 아래 4개입니다.</p>
+<ul>
+<li><code>ADO_ORG</code>: <code>iteyes-ito</code></li>
+<li><code>ADO_PROJECT</code>: <code>iwon-smart-ops</code></li>
+<li><code>ADO_PIPELINE_ID</code>: Azure DevOps 배포 파이프라인 ID<br>
+→ <code>gitops/terraform/azuredevops-bootstrap</code>의 <code>create_pipeline = true</code> 적용 후 <code>terraform output pipeline_id</code> 로 확인</li>
+<li><code>ADO_PAT</code>: Azure DevOps REST 호출 가능 PAT</li>
+</ul>
+<p>PoC에서는 <code>ADO_PAT</code> 하나로 Feed publish 와 Pipeline run 호출을 같이 처리할 수 있습니다. 운영 전환 시에는 publish 용 PAT 와 run 호출용 PAT 를 분리하는 것이 안전합니다.</p>
+<h3 id="26-azure-pipelines-vmyml-파라미터-매핑">2.6 azure-pipelines-vm.yml 파라미터 매핑 </h3>
+<p>GitHub Actions가 REST API로 넘겨야 하는 값은 현재 YAML parameter 와 아래처럼 1:1로 맞춥니다.</p>
+<table>
+<thead>
+<tr>
+<th>Azure DevOps parameter</th>
+<th>값 생성 기준</th>
+<th>예시</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>runTerraform</code></td>
+<td>일반 배포는 <code>false</code>, 인프라까지 포함하면 <code>true</code></td>
+<td><code>false</code></td>
+</tr>
+<tr>
+<td><code>deployTarget</code></td>
+<td>리포지토리 또는 서비스 종류에 따라 결정</td>
+<td><code>was</code></td>
+</tr>
+<tr>
+<td><code>artifactFeedName</code></td>
+<td>고정</td>
+<td><code>iwon-smart-feed</code></td>
+</tr>
+<tr>
+<td><code>artifactFeedView</code></td>
+<td>현재 기본값 유지</td>
+<td><code>""</code></td>
+</tr>
+<tr>
+<td><code>mavenPackageDefinition</code></td>
+<td>서비스별 패키지 정의 직접 전달</td>
+<td><code>com.iteyes.smart:smart-was</code></td>
+</tr>
+<tr>
+<td><code>mavenPackageVersion</code></td>
+<td>GitHub Actions에서 계산한 불변 버전 사용</td>
+<td><code>1.0.0-main.7c2d9a1</code></td>
+</tr>
+<tr>
+<td><code>artifactPattern</code></td>
+<td><code>web</code> 는 <code>*.zip</code>, 나머지는 <code>*.jar</code></td>
+<td><code>*.jar</code></td>
+</tr>
+<tr>
+<td><code>bootstrapAdoAgent</code></td>
+<td>최초 1회 또는 장애 복구 시 self-hosted agent 자동 설치가 필요하면 <code>true</code></td>
+<td><code>true</code></td>
+</tr>
+<tr>
+<td><code>bootstrapAgentTarget</code></td>
+<td>ADO agent 를 설치/등록할 inventory 대상</td>
+<td><code>bastion</code></td>
+</tr>
+</tbody>
+</table>
+<p>서비스별 기본 매핑은 아래와 같습니다.</p>
+<ul>
+<li><code>web</code> -&gt; <code>mavenPackageDefinition=com.iteyes.smart:smart-web</code>, <code>artifactPattern=*.zip</code></li>
+<li><code>was</code> -&gt; <code>mavenPackageDefinition=com.iteyes.smart:smart-was</code>, <code>artifactPattern=*.jar</code></li>
+<li><code>app</code> -&gt; <code>mavenPackageDefinition=com.iteyes.smart:smart-app</code>, <code>artifactPattern=*.jar</code></li>
+<li><code>integration</code> -&gt; <code>mavenPackageDefinition=com.iteyes.smart:smart-integration</code>, <code>artifactPattern=*.jar</code></li>
+</ul>
+<p>Web/WAS 단일 저장소 규칙:</p>
+<ul>
+<li>IWonPaymentWeb/web 폴더 파이프라인은 <code>deployTarget=web</code> 으로만 호출</li>
+<li>IWonPaymentWeb/was 폴더 파이프라인은 <code>deployTarget=was</code> 으로만 호출</li>
+<li>두 파이프라인은 동일 저장소를 보더라도 배포 대상이 섞이지 않도록 분리 유지</li>
+</ul>
+<h4 id="261-실제-실행-예시-run-parameters">2.6.1 실제 실행 예시 (Run Parameters) </h4>
+<ol>
+<li><strong>최초 1회 bootstrap + 배포</strong></li>
+</ol>
+<pre data-role="codeBlock" data-info="yaml" class="language-yaml yaml"><code><span class="token key atrule">runTerraform</span><span class="token punctuation">:</span> <span class="token boolean important">false</span>
+<span class="token key atrule">deployTarget</span><span class="token punctuation">:</span> was
+<span class="token key atrule">artifactFeedName</span><span class="token punctuation">:</span> iwon<span class="token punctuation">-</span>smart<span class="token punctuation">-</span>feed
+<span class="token key atrule">artifactFeedView</span><span class="token punctuation">:</span> <span class="token string">""</span>
+<span class="token key atrule">mavenPackageDefinition</span><span class="token punctuation">:</span> com.iteyes.smart<span class="token punctuation">:</span>iwon<span class="token punctuation">-</span>poc
+<span class="token key atrule">mavenPackageVersion</span><span class="token punctuation">:</span> latest
+<span class="token key atrule">artifactPattern</span><span class="token punctuation">:</span> <span class="token string">"*.jar"</span>
+<span class="token key atrule">bootstrapAdoAgent</span><span class="token punctuation">:</span> <span class="token boolean important">true</span>
+<span class="token key atrule">bootstrapAgentTarget</span><span class="token punctuation">:</span> bastion
+</code></pre><ol start="2">
+<li><strong>일반 배포(이미 agent 가 online 인 경우)</strong></li>
+</ol>
+<pre data-role="codeBlock" data-info="yaml" class="language-yaml yaml"><code><span class="token key atrule">runTerraform</span><span class="token punctuation">:</span> <span class="token boolean important">false</span>
+<span class="token key atrule">deployTarget</span><span class="token punctuation">:</span> was
+<span class="token key atrule">artifactFeedName</span><span class="token punctuation">:</span> iwon<span class="token punctuation">-</span>smart<span class="token punctuation">-</span>feed
+<span class="token key atrule">artifactFeedView</span><span class="token punctuation">:</span> <span class="token string">""</span>
+<span class="token key atrule">mavenPackageDefinition</span><span class="token punctuation">:</span> com.iteyes.smart<span class="token punctuation">:</span>smart<span class="token punctuation">-</span>was
+<span class="token key atrule">mavenPackageVersion</span><span class="token punctuation">:</span> 1.0.0<span class="token punctuation">-</span>main.7c2d9a1
+<span class="token key atrule">artifactPattern</span><span class="token punctuation">:</span> <span class="token string">"*.jar"</span>
+<span class="token key atrule">bootstrapAdoAgent</span><span class="token punctuation">:</span> <span class="token boolean important">false</span>
+<span class="token key atrule">bootstrapAgentTarget</span><span class="token punctuation">:</span> bastion
+</code></pre><ol start="3">
+<li><strong>bootstrap 시 추가로 필요한 변수/시크릿</strong></li>
+</ol>
+<pre data-role="codeBlock" data-info="text" class="language-text text"><code>ADO_AGENT_URL=https://dev.azure.com/iteyes-ito
+ADO_AGENT_POOL=Default
+ADO_AGENT_PAT=&lt;Azure DevOps PAT&gt;
+ANSIBLE_SSH_PRIVATE_KEY_SECURE_FILE=id_rsa
+</code></pre><blockquote>
+<p>참고: <code>bootstrapAdoAgent=true</code> 단계는 <code>ubuntu-latest</code> 또는 이미 online 인 기존 agent 중 하나가 최소 1개는 있어야 최초 실행이 가능합니다.</p>
+</blockquote>
+<h3 id="27-github-actions-호출-예시-iwonpaymentweb-전용-2개-파일">2.7 GitHub Actions 호출 예시 (IWonPaymentWeb 전용 2개 파일) </h3>
+<p>IWonPaymentWeb 저장소는 web/was 폴더가 공존하므로, 자동배포 워크플로우를 반드시 2개로 분리합니다.</p>
+<ol>
+<li>deploy-web.yml (web 폴더 전용)</li>
+</ol>
+<pre data-role="codeBlock" data-info="yaml" class="language-yaml yaml"><code><span class="token key atrule">name</span><span class="token punctuation">:</span> Deploy Web Artifact
+
+<span class="token key atrule">on</span><span class="token punctuation">:</span>
+  <span class="token key atrule">push</span><span class="token punctuation">:</span>
+    <span class="token key atrule">branches</span><span class="token punctuation">:</span> <span class="token punctuation">[</span> <span class="token string">"main"</span> <span class="token punctuation">]</span>
+    <span class="token key atrule">paths</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token string">"web/**"</span>
+
+<span class="token key atrule">jobs</span><span class="token punctuation">:</span>
+  <span class="token key atrule">build-publish-trigger</span><span class="token punctuation">:</span>
+    <span class="token key atrule">runs-on</span><span class="token punctuation">:</span> ubuntu<span class="token punctuation">-</span>latest
+    <span class="token key atrule">permissions</span><span class="token punctuation">:</span>
+      <span class="token key atrule">contents</span><span class="token punctuation">:</span> read
+    <span class="token key atrule">env</span><span class="token punctuation">:</span>
+      <span class="token key atrule">ADO_ORG</span><span class="token punctuation">:</span> iteyes<span class="token punctuation">-</span>ito
+      <span class="token key atrule">ADO_PROJECT</span><span class="token punctuation">:</span> iwon<span class="token punctuation">-</span>smart<span class="token punctuation">-</span>ops
+      <span class="token key atrule">ADO_PIPELINE_ID</span><span class="token punctuation">:</span> $<span class="token punctuation">{</span><span class="token punctuation">{</span> secrets.ADO_PIPELINE_ID <span class="token punctuation">}</span><span class="token punctuation">}</span>
+
+    <span class="token key atrule">steps</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Checkout
+        <span class="token key atrule">uses</span><span class="token punctuation">:</span> actions/checkout@v4
+
+      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Set up JDK 17
+        <span class="token key atrule">uses</span><span class="token punctuation">:</span> actions/setup<span class="token punctuation">-</span>java@v4
+        <span class="token key atrule">with</span><span class="token punctuation">:</span>
+          <span class="token key atrule">java-version</span><span class="token punctuation">:</span> <span class="token string">'17'</span>
+          <span class="token key atrule">distribution</span><span class="token punctuation">:</span> <span class="token string">'temurin'</span>
+
+      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Compute immutable version
+        <span class="token key atrule">run</span><span class="token punctuation">:</span> <span class="token punctuation">|</span><span class="token scalar string">
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          echo "APP_VERSION=1.0.0-main.${SHORT_SHA}" &gt;&gt; "$GITHUB_ENV"</span>
+
+      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Build web module
+        <span class="token key atrule">run</span><span class="token punctuation">:</span> chmod +x gradlew <span class="token important">&amp;&amp;</span> ./gradlew <span class="token punctuation">:</span>web<span class="token punctuation">:</span>build <span class="token punctuation">-</span>x test
+
+      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Publish web package
+        <span class="token key atrule">run</span><span class="token punctuation">:</span> ./gradlew <span class="token punctuation">:</span>web<span class="token punctuation">:</span>publish
+        <span class="token key atrule">env</span><span class="token punctuation">:</span>
+          <span class="token key atrule">APP_VERSION</span><span class="token punctuation">:</span> $<span class="token punctuation">{</span><span class="token punctuation">{</span> env.APP_VERSION <span class="token punctuation">}</span><span class="token punctuation">}</span>
+          <span class="token key atrule">AZURE_ARTIFACTS_ENV_ACCESS_TOKEN</span><span class="token punctuation">:</span> $<span class="token punctuation">{</span><span class="token punctuation">{</span> secrets.ADO_PAT <span class="token punctuation">}</span><span class="token punctuation">}</span>
+
+      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Trigger Azure DevOps deploy (web)
+        <span class="token key atrule">env</span><span class="token punctuation">:</span>
+          <span class="token key atrule">ADO_PAT</span><span class="token punctuation">:</span> $<span class="token punctuation">{</span><span class="token punctuation">{</span> secrets.ADO_PAT <span class="token punctuation">}</span><span class="token punctuation">}</span>
+        <span class="token key atrule">run</span><span class="token punctuation">:</span> <span class="token punctuation">|</span><span class="token scalar string">
+          set -euo pipefail
+          API_URL="https://dev.azure.com/${ADO_ORG}/${ADO_PROJECT}/_apis/pipelines/${ADO_PIPELINE_ID}/runs?api-version=7.1"
+          cat &gt; run-pipeline.json &lt;&lt;EOF
+          {
+            "resources": {
+              "repositories": {
+                "self": {
+                  "refName": "refs/heads/main"
+                }
+              }
+            },
+            "templateParameters": {
+              "runTerraform": false,
+              "deployTarget": "web",
+              "artifactFeedName": "iwon-smart-feed",
+              "artifactFeedView": "",
+              "mavenPackageDefinition": "com.iteyes.smart:smart-web",
+              "mavenPackageVersion": "${APP_VERSION}",
+              "artifactPattern": "*.zip"
+            }
+          }
+          EOF
+          curl --fail --silent --show-error \
+            -u ":${ADO_PAT}" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            --data @run-pipeline.json \
+            "${API_URL}"</span>
+</code></pre><ol start="2">
+<li>deploy-was.yml (was 폴더 전용)</li>
+</ol>
+<pre data-role="codeBlock" data-info="yaml" class="language-yaml yaml"><code><span class="token key atrule">name</span><span class="token punctuation">:</span> Deploy WAS Artifact
+
+<span class="token key atrule">on</span><span class="token punctuation">:</span>
+  <span class="token key atrule">push</span><span class="token punctuation">:</span>
+    <span class="token key atrule">branches</span><span class="token punctuation">:</span> <span class="token punctuation">[</span> <span class="token string">"main"</span> <span class="token punctuation">]</span>
+    <span class="token key atrule">paths</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token string">"was/**"</span>
+
+<span class="token key atrule">jobs</span><span class="token punctuation">:</span>
+  <span class="token key atrule">build-publish-trigger</span><span class="token punctuation">:</span>
+    <span class="token key atrule">runs-on</span><span class="token punctuation">:</span> ubuntu<span class="token punctuation">-</span>latest
+    <span class="token key atrule">permissions</span><span class="token punctuation">:</span>
+      <span class="token key atrule">contents</span><span class="token punctuation">:</span> read
+    <span class="token key atrule">env</span><span class="token punctuation">:</span>
+      <span class="token key atrule">ADO_ORG</span><span class="token punctuation">:</span> iteyes<span class="token punctuation">-</span>ito
+      <span class="token key atrule">ADO_PROJECT</span><span class="token punctuation">:</span> iwon<span class="token punctuation">-</span>smart<span class="token punctuation">-</span>ops
+      <span class="token key atrule">ADO_PIPELINE_ID</span><span class="token punctuation">:</span> $<span class="token punctuation">{</span><span class="token punctuation">{</span> secrets.ADO_PIPELINE_ID <span class="token punctuation">}</span><span class="token punctuation">}</span>
+
+    <span class="token key atrule">steps</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Checkout
+        <span class="token key atrule">uses</span><span class="token punctuation">:</span> actions/checkout@v4
+
+      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Set up JDK 17
+        <span class="token key atrule">uses</span><span class="token punctuation">:</span> actions/setup<span class="token punctuation">-</span>java@v4
+        <span class="token key atrule">with</span><span class="token punctuation">:</span>
+          <span class="token key atrule">java-version</span><span class="token punctuation">:</span> <span class="token string">'17'</span>
+          <span class="token key atrule">distribution</span><span class="token punctuation">:</span> <span class="token string">'temurin'</span>
+
+      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Compute immutable version
+        <span class="token key atrule">run</span><span class="token punctuation">:</span> <span class="token punctuation">|</span><span class="token scalar string">
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          echo "APP_VERSION=1.0.0-main.${SHORT_SHA}" &gt;&gt; "$GITHUB_ENV"</span>
+
+      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Build was module
+        <span class="token key atrule">run</span><span class="token punctuation">:</span> chmod +x gradlew <span class="token important">&amp;&amp;</span> ./gradlew <span class="token punctuation">:</span>was<span class="token punctuation">:</span>build <span class="token punctuation">-</span>x test
+
+      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Publish was package
+        <span class="token key atrule">run</span><span class="token punctuation">:</span> ./gradlew <span class="token punctuation">:</span>was<span class="token punctuation">:</span>publish
+        <span class="token key atrule">env</span><span class="token punctuation">:</span>
+          <span class="token key atrule">APP_VERSION</span><span class="token punctuation">:</span> $<span class="token punctuation">{</span><span class="token punctuation">{</span> env.APP_VERSION <span class="token punctuation">}</span><span class="token punctuation">}</span>
+          <span class="token key atrule">AZURE_ARTIFACTS_ENV_ACCESS_TOKEN</span><span class="token punctuation">:</span> $<span class="token punctuation">{</span><span class="token punctuation">{</span> secrets.ADO_PAT <span class="token punctuation">}</span><span class="token punctuation">}</span>
+
+      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Trigger Azure DevOps deploy (was)
+        <span class="token key atrule">env</span><span class="token punctuation">:</span>
+          <span class="token key atrule">ADO_PAT</span><span class="token punctuation">:</span> $<span class="token punctuation">{</span><span class="token punctuation">{</span> secrets.ADO_PAT <span class="token punctuation">}</span><span class="token punctuation">}</span>
+        <span class="token key atrule">run</span><span class="token punctuation">:</span> <span class="token punctuation">|</span><span class="token scalar string">
+          set -euo pipefail
+          API_URL="https://dev.azure.com/${ADO_ORG}/${ADO_PROJECT}/_apis/pipelines/${ADO_PIPELINE_ID}/runs?api-version=7.1"
+          cat &gt; run-pipeline.json &lt;&lt;EOF
+          {
+            "resources": {
+              "repositories": {
+                "self": {
+                  "refName": "refs/heads/main"
+                }
+              }
+            },
+            "templateParameters": {
+              "runTerraform": false,
+              "deployTarget": "was",
+              "artifactFeedName": "iwon-smart-feed",
+              "artifactFeedView": "",
+              "mavenPackageDefinition": "com.iteyes.smart:smart-was",
+              "mavenPackageVersion": "${APP_VERSION}",
+              "artifactPattern": "*.jar"
+            }
+          }
+          EOF
+          curl --fail --silent --show-error \
+            -u ":${ADO_PAT}" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            --data @run-pipeline.json \
+            "${API_URL}"</span>
+</code></pre><p>적용 포인트는 아래와 같습니다.</p>
+<ul>
+<li>GitHub Actions 는 source repo 에 존재한다.</li>
+<li>Azure DevOps 배포 YAML 은 gitops repo 에 존재한다.</li>
+<li>두 저장소를 직접 합치지 않고, REST API 호출만으로 CD 시작을 연결한다.</li>
+<li><code>mavenPackageVersion</code> 은 반드시 <code>latest</code> 가 아니라 방금 publish 한 <code>APP_VERSION</code> 값을 넘긴다.</li>
+<li><code>deployTarget</code> 은 저장소별로 고정하거나 GitHub repository 변수로 분기할 수 있다.</li>
+</ul>
+<h3 id="28-권장-운영-규칙">2.8 권장 운영 규칙 </h3>
+<p>현재 PoC에서 바로 적용할 운영 규칙은 아래로 정리합니다.</p>
+<ul>
+<li><a href="gitops/ansible/azure-pipelines-vm.yml">gitops/ansible/azure-pipelines-vm.yml</a> 의 <code>trigger: none</code> 은 유지한다.</li>
+<li>자동배포 시작 책임은 GitHub Actions 가 가진다.</li>
+<li>Azure DevOps 는 배포 엔진으로만 동작한다.</li>
+<li><code>mavenPackageVersion</code> 은 immutable version 을 사용한다.</li>
+<li><code>runTerraform</code> 은 일반 애플리케이션 배포 시 <code>false</code> 를 기본값으로 사용한다.</li>
+</ul>
+<p>이렇게 고정하면 현재 gitops 구조를 유지하면서도, 개발자 <code>main</code> 머지부터 Feed publish, Azure DevOps 실행, VM 배포까지 한 흐름으로 자동 연결할 수 있습니다.</p>
+<hr>
+<h2 id="3-azure-devops-cd-설정-배포-엔진">3. Azure DevOps CD 설정 (배포 엔진) </h2>
+<p>이 파이프라인의 핵심은 GitHub Actions가 Artifacts Feed에 업로드한 JAR를 받아 Terraform으로 인프라 상태를 확인하고, Ansible로 VM에 실배포하는 것입니다.</p>
+<h3 id="31-cd-파이프라인-전체-흐름-cd-workflow">3.1 CD 파이프라인 전체 흐름 (CD Workflow) </h3>
+<ol>
+<li>Trigger: GitHub Actions가 Feed publish 성공 직후 Azure DevOps Runs REST API를 호출해 파이프라인을 실행합니다. PoC에서는 필요 시 수동 실행도 허용합니다.</li>
+<li>Artifact Download: 피드에서 배포 대상(Web/WAS/App/Integration)에 맞는 JAR를 다운로드합니다.</li>
+<li>Infrastructure Check(Terraform): 배포 대상 VM 인벤토리/네트워크 상태를 점검합니다.</li>
+<li>Application Deploy(Ansible): VM에 접속해 기존 프로세스를 종료하고 새 JAR를 배포한 뒤 재기동합니다.</li>
+</ol>
+<h3 id="32-cd-파이프라인-샘플-azure-pipelines-cdyml">3.2 CD 파이프라인 샘플 (azure-pipelines-cd.yml) </h3>
+<p>아래 예시는 이사님 요청 구조를 기준으로 시스템별 분기 배포가 가능하도록 정리한 샘플입니다.</p>
+<p>실제 저장소 반영 파일: <a href="gitops/ansible/azure-pipelines-vm.yml">gitops/ansible/azure-pipelines-vm.yml</a></p>
+<pre data-role="codeBlock" data-info="yaml" class="language-yaml yaml"><code><span class="token key atrule">trigger</span><span class="token punctuation">:</span> none
+<span class="token key atrule">pr</span><span class="token punctuation">:</span> none
+
+<span class="token key atrule">parameters</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> runTerraform
+    <span class="token key atrule">type</span><span class="token punctuation">:</span> boolean
+    <span class="token key atrule">default</span><span class="token punctuation">:</span> <span class="token boolean important">false</span>
+
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> deployTarget
+    <span class="token key atrule">type</span><span class="token punctuation">:</span> string
+    <span class="token key atrule">default</span><span class="token punctuation">:</span> was
+    <span class="token key atrule">values</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> web
+      <span class="token punctuation">-</span> was
+      <span class="token punctuation">-</span> app
+      <span class="token punctuation">-</span> integration
+
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> artifactFeedName
+    <span class="token key atrule">type</span><span class="token punctuation">:</span> string
+    <span class="token key atrule">default</span><span class="token punctuation">:</span> iwon<span class="token punctuation">-</span>smart<span class="token punctuation">-</span>feed
+
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> artifactFeedView
+    <span class="token key atrule">type</span><span class="token punctuation">:</span> string
+    <span class="token key atrule">default</span><span class="token punctuation">:</span> <span class="token string">""</span>
+
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> mavenPackageDefinition
+    <span class="token key atrule">type</span><span class="token punctuation">:</span> string
+    <span class="token key atrule">default</span><span class="token punctuation">:</span> <span class="token string">""</span>
+
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> mavenPackageVersion
+    <span class="token key atrule">type</span><span class="token punctuation">:</span> string
+    <span class="token key atrule">default</span><span class="token punctuation">:</span> latest
+
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> artifactPattern
+    <span class="token key atrule">type</span><span class="token punctuation">:</span> string
+    <span class="token key atrule">default</span><span class="token punctuation">:</span> <span class="token string">""</span>
+
+<span class="token key atrule">variables</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">group</span><span class="token punctuation">:</span> iwon<span class="token punctuation">-</span>smart<span class="token punctuation">-</span>ops<span class="token punctuation">-</span>vg
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> TF_WORKING_DIR
+    <span class="token key atrule">value</span><span class="token punctuation">:</span> vm<span class="token punctuation">-</span>azure
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> TFVARS_FILE
+    <span class="token key atrule">value</span><span class="token punctuation">:</span> vm<span class="token punctuation">-</span>azure/environments/prod.tfvars
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> TF_OUTPUT_JSON
+    <span class="token key atrule">value</span><span class="token punctuation">:</span> $(Pipeline.Workspace)/generated/tf<span class="token punctuation">-</span>output.json
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> ANSIBLE_INVENTORY_OUT
+    <span class="token key atrule">value</span><span class="token punctuation">:</span> $(Pipeline.Workspace)/generated/inventory.generated.ini
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> ANSIBLE_PLAYBOOK_PATH
+    <span class="token key atrule">value</span><span class="token punctuation">:</span> gitops/ansible/deploy<span class="token punctuation">-</span>playbook.yml
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> ANSIBLE_CONFIG_PATH
+    <span class="token key atrule">value</span><span class="token punctuation">:</span> gitops/ansible/ansible.cfg
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> AZURE_SERVICE_CONNECTION
+    <span class="token key atrule">value</span><span class="token punctuation">:</span> <span class="token string">""</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> TFSTATE_RG
+    <span class="token key atrule">value</span><span class="token punctuation">:</span> <span class="token string">""</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> TFSTATE_STORAGE
+    <span class="token key atrule">value</span><span class="token punctuation">:</span> <span class="token string">""</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> TFSTATE_CONTAINER
+    <span class="token key atrule">value</span><span class="token punctuation">:</span> tfstate
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> TFSTATE_KEY
+    <span class="token key atrule">value</span><span class="token punctuation">:</span> vm<span class="token punctuation">-</span>azure/prod.tfstate
+
+<span class="token key atrule">stages</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">stage</span><span class="token punctuation">:</span> Terraform
+    <span class="token key atrule">condition</span><span class="token punctuation">:</span> and(succeeded()<span class="token punctuation">,</span> eq('$<span class="token punctuation">{</span><span class="token punctuation">{</span> parameters.runTerraform <span class="token punctuation">}</span><span class="token punctuation">}</span>'<span class="token punctuation">,</span> true))
+    <span class="token key atrule">jobs</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token key atrule">deployment</span><span class="token punctuation">:</span> TerraformApply
+        <span class="token key atrule">environment</span><span class="token punctuation">:</span> iwon<span class="token punctuation">-</span>gitops<span class="token punctuation">-</span>infra
+        <span class="token key atrule">strategy</span><span class="token punctuation">:</span>
+          <span class="token key atrule">runOnce</span><span class="token punctuation">:</span>
+            <span class="token key atrule">deploy</span><span class="token punctuation">:</span>
+              <span class="token key atrule">pool</span><span class="token punctuation">:</span>
+                <span class="token key atrule">vmImage</span><span class="token punctuation">:</span> ubuntu<span class="token punctuation">-</span>latest
+              <span class="token key atrule">steps</span><span class="token punctuation">:</span>
+                <span class="token punctuation">-</span> <span class="token key atrule">checkout</span><span class="token punctuation">:</span> self
+                <span class="token punctuation">-</span> <span class="token key atrule">task</span><span class="token punctuation">:</span> TerraformInstaller@1
+                  <span class="token key atrule">inputs</span><span class="token punctuation">:</span>
+                    <span class="token key atrule">terraformVersion</span><span class="token punctuation">:</span> latest
+                <span class="token punctuation">-</span> <span class="token key atrule">task</span><span class="token punctuation">:</span> AzureCLI@2
+                  <span class="token key atrule">inputs</span><span class="token punctuation">:</span>
+                    <span class="token key atrule">azureSubscription</span><span class="token punctuation">:</span> $(AZURE_SERVICE_CONNECTION)
+                    <span class="token key atrule">scriptType</span><span class="token punctuation">:</span> bash
+                    <span class="token key atrule">scriptLocation</span><span class="token punctuation">:</span> inlineScript
+                    <span class="token key atrule">inlineScript</span><span class="token punctuation">:</span> <span class="token punctuation">|</span><span class="token scalar string">
+                      set -euo pipefail
+                      terraform -chdir="$(TF_WORKING_DIR)" init \
+                        -backend-config="resource_group_name=$(TFSTATE_RG)" \
+                        -backend-config="storage_account_name=$(TFSTATE_STORAGE)" \
+                        -backend-config="container_name=$(TFSTATE_CONTAINER)" \
+                        -backend-config="key=$(TFSTATE_KEY)"
+                      terraform -chdir="$(TF_WORKING_DIR)" plan -var-file="$(TFVARS_FILE)" -out=tfplan
+                      terraform -chdir="$(TF_WORKING_DIR)" apply -auto-approve tfplan
+                      mkdir -p "$(Pipeline.Workspace)/generated"
+                      terraform -chdir="$(TF_WORKING_DIR)" output -json &gt; "$(TF_OUTPUT_JSON)"</span>
+
+  <span class="token punctuation">-</span> <span class="token key atrule">stage</span><span class="token punctuation">:</span> Deploy
+    <span class="token key atrule">dependsOn</span><span class="token punctuation">:</span> Terraform
+    <span class="token key atrule">condition</span><span class="token punctuation">:</span> or(and(eq('$<span class="token punctuation">{</span><span class="token punctuation">{</span> parameters.runTerraform <span class="token punctuation">}</span><span class="token punctuation">}</span>'<span class="token punctuation">,</span> true)<span class="token punctuation">,</span> succeeded('Terraform'))<span class="token punctuation">,</span> eq('$<span class="token punctuation">{</span><span class="token punctuation">{</span> parameters.runTerraform <span class="token punctuation">}</span><span class="token punctuation">}</span>'<span class="token punctuation">,</span> false))
+    <span class="token key atrule">jobs</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token key atrule">deployment</span><span class="token punctuation">:</span> DeployByAnsible
+        <span class="token key atrule">environment</span><span class="token punctuation">:</span> iwon<span class="token punctuation">-</span>gitops<span class="token punctuation">-</span>app
+        <span class="token key atrule">strategy</span><span class="token punctuation">:</span>
+          <span class="token key atrule">runOnce</span><span class="token punctuation">:</span>
+            <span class="token key atrule">deploy</span><span class="token punctuation">:</span>
+              <span class="token key atrule">pool</span><span class="token punctuation">:</span>
+                <span class="token key atrule">vmImage</span><span class="token punctuation">:</span> ubuntu<span class="token punctuation">-</span>latest
+              <span class="token key atrule">steps</span><span class="token punctuation">:</span>
+                <span class="token punctuation">-</span> <span class="token key atrule">checkout</span><span class="token punctuation">:</span> self
+                <span class="token punctuation">-</span> <span class="token key atrule">task</span><span class="token punctuation">:</span> DownloadPackage@1
+                  <span class="token key atrule">inputs</span><span class="token punctuation">:</span>
+                    <span class="token key atrule">packageType</span><span class="token punctuation">:</span> maven
+                    <span class="token key atrule">feed</span><span class="token punctuation">:</span> $<span class="token punctuation">{</span><span class="token punctuation">{</span> parameters.artifactFeedName <span class="token punctuation">}</span><span class="token punctuation">}</span>
+                    <span class="token key atrule">view</span><span class="token punctuation">:</span> $<span class="token punctuation">{</span><span class="token punctuation">{</span> parameters.artifactFeedView <span class="token punctuation">}</span><span class="token punctuation">}</span>
+                    <span class="token key atrule">definition</span><span class="token punctuation">:</span> $<span class="token punctuation">{</span><span class="token punctuation">{</span> parameters.mavenPackageDefinition <span class="token punctuation">}</span><span class="token punctuation">}</span>
+                    <span class="token key atrule">version</span><span class="token punctuation">:</span> $<span class="token punctuation">{</span><span class="token punctuation">{</span> parameters.mavenPackageVersion <span class="token punctuation">}</span><span class="token punctuation">}</span>
+                    <span class="token key atrule">downloadPath</span><span class="token punctuation">:</span> $(System.ArtifactsDirectory)
+                <span class="token punctuation">-</span> <span class="token key atrule">bash</span><span class="token punctuation">:</span> <span class="token punctuation">|</span><span class="token scalar string">
+                    set -euo pipefail
+                    TARGET_ARTIFACT="$(find "$(System.ArtifactsDirectory)" -type f -name "${PATTERN}" | sort | head -n 1)"
+                    if [ -z "${TARGET_ARTIFACT}" ]; then
+                      echo "artifact not found. pattern=${PATTERN}"
+                      exit 1
+                    fi
+                    echo "##vso[task.setvariable variable=TARGET_ARTIFACT]${TARGET_ARTIFACT}"</span>
+                  <span class="token key atrule">env</span><span class="token punctuation">:</span>
+                    <span class="token key atrule">PATTERN</span><span class="token punctuation">:</span> $<span class="token punctuation">{</span><span class="token punctuation">{</span> parameters.artifactPattern <span class="token punctuation">}</span><span class="token punctuation">}</span>
+                <span class="token punctuation">-</span> <span class="token key atrule">bash</span><span class="token punctuation">:</span> <span class="token punctuation">|</span><span class="token scalar string">
+                    export ANSIBLE_CONFIG="$(Build.SourcesDirectory)/$(ANSIBLE_CONFIG_PATH)"
+                    ansible-playbook \
+                      -i "$(ANSIBLE_INVENTORY_OUT)" \
+                      "$(Build.SourcesDirectory)/$(ANSIBLE_PLAYBOOK_PATH)" \
+                      --limit "${{ parameters.deployTarget }}" \
+                      --extra-vars "deployTarget=${{ parameters.deployTarget }} target_artifact=$(TARGET_ARTIFACT)"</span>
+</code></pre><p>샘플 적용 시 주의사항:</p>
+<ul>
+<li>REST 호출에서 <code>mavenPackageVersion</code> 은 반드시 <code>APP_VERSION</code> 같은 고정 버전을 전달합니다.</li>
+<li>REST 호출에서 <code>mavenPackageDefinition</code> 과 <code>artifactPattern</code> 을 서비스에 맞게 전달합니다.</li>
+<li><code>runTerraform=false</code> 인 경우에도 Terraform state 접근 변수(<code>TFSTATE_RG</code>, <code>TFSTATE_STORAGE</code>)는 사전 구성되어야 inventory 생성이 가능합니다.</li>
+</ul>
+<h3 id="33-핵심-구성-요소-상세-설명">3.3 핵심 구성 요소 상세 설명 </h3>
+<ol>
+<li>Artifact 감지 및 다운로드 (DownloadPackage)</li>
+</ol>
+<ul>
+<li>definition 값은 GitHub 빌드 산출물의 artifactId와 매칭됩니다. 예: smart-was</li>
+<li>이 단계 완료 후 에이전트에 배포 파일이 준비됩니다.</li>
+<li>web은 zip, was/app/integration은 jar를 기본 산출물로 사용합니다.</li>
+<li>파이프라인 기본값은 <code>mavenPackageVersion=latest</code> 이므로, 자동배포 REST 호출에서 반드시 고정 버전(APP_VERSION)을 전달합니다.</li>
+</ul>
+<ol start="2">
+<li>Terraform + Inventory 연동</li>
+</ol>
+<ul>
+<li><code>runTerraform=true</code> 인 경우 Terraform stage에서 apply 후 output json을 생성합니다.</li>
+<li><code>runTerraform=false</code> 인 경우에도 Terraform state 접근 정보를 통해 output json을 조회해야 inventory 생성이 가능합니다.</li>
+<li>inventory 생성 스크립트가 output json을 기반으로 <code>ANSIBLE_INVENTORY_OUT</code> 파일을 만들고, Ansible은 해당 인벤토리를 사용합니다.</li>
+</ul>
+<ol start="3">
+<li>Ansible Wrapper Playbook 로직(권장)</li>
+</ol>
+<ul>
+<li>gitops/ansible/deploy-playbook.yml 에서 deployTarget 별 task 파일을 분기합니다.</li>
+<li>실제 서버별 배포는 vm-ansible/roles 를 재사용합니다.</li>
+<li>web은 web role로 zip 배포 + nginx reload, was/app/integration은 java_service role로 jar 배포 + systemd 재기동을 수행합니다.</li>
+</ul>
+<hr>
+<h2 id="4-시스템별-배포-매트릭스-및-전략">4. 시스템별 배포 매트릭스 및 전략 </h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">구분</th>
+<th style="text-align:left">GitHub (Source/CI)</th>
+<th style="text-align:left">Azure DevOps (CD/Infra)</th>
+<th style="text-align:left">배포 로직</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">Web</td>
+<td style="text-align:left">Web 소스 빌드</td>
+<td style="text-align:left">Nginx 설정 및 정적 파일 배포</td>
+<td style="text-align:left">파일 교체 및 Nginx Reload</td>
+</tr>
+<tr>
+<td style="text-align:left">WAS</td>
+<td style="text-align:left">WAS 소스 빌드</td>
+<td style="text-align:left">JVM 환경 및 JAR 기동</td>
+<td style="text-align:left">기존 프로세스 종료 후 새 JAR 실행</td>
+</tr>
+<tr>
+<td style="text-align:left">App</td>
+<td style="text-align:left">App 소스 빌드</td>
+<td style="text-align:left">모바일 백엔드 API 배포</td>
+<td style="text-align:left">API 가용성 확인 후 전환</td>
+</tr>
+<tr>
+<td style="text-align:left">Integration</td>
+<td style="text-align:left">연계 소스 빌드</td>
+<td style="text-align:left">인터페이스 엔진/큐 기동</td>
+<td style="text-align:left">엔진 재시작 및 상태 확인</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="5-요청-기준-운영-팁">5. 요청 기준 운영 팁 </h2>
+<h3 id="51-승인-절차-approval">5.1 승인 절차 (Approval) </h3>
+<ul>
+<li>운영(Production) 배포는 Azure DevOps Environment 승인 정책으로 잠금 처리</li>
+<li>담당 승인자 없이 자동 배포(PoC)도 허용하되, 승인자 설정 시 prod_approval_approver_ids에 Azure DevOps 사용자 Origin ID를 입력해 승인자 지정 가능</li>
+<li>승인자 Origin ID는 Azure DevOps REST API로 조회 가능: GET <a href="https://dev.azure.com/%7BOrg%7D/%7BProject%7D/_apis/graph/users?api-version=6.0-preview.1">https://dev.azure.com/{Org}/{Project}/_apis/graph/users?api-version=6.0-preview.1</a></li>
+</ul>
+<h3 id="52-롤백-rollback">5.2 롤백 (Rollback) </h3>
+<ul>
+<li>배포 실패 시 DownloadPackage의 버전을 이전 안정 버전으로 지정해 즉시 재배포</li>
+<li>권장: latest 대신 고정 버전으로 재배포해 복구 재현성을 보장</li>
+</ul>
+<h3 id="53-추가-체크리스트">5.3 추가 체크리스트 </h3>
+<p><strong>ADO 리소스 부트스트랩 (최초 1회)</strong></p>
+<table>
+<thead>
+<tr>
+<th>항목</th>
+<th>방법</th>
+<th>비고</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Organization</td>
+<td>ADO 콘솔 수동 생성</td>
+<td>Terraform 생성 불가</td>
+</tr>
+<tr>
+<td>Project / Feed</td>
+<td><code>terraform apply</code></td>
+<td><code>create_project=false</code> 기본</td>
+</tr>
+<tr>
+<td>Service Connection (Azure RM)</td>
+<td><code>create_service_connection=true</code> 후 <code>terraform apply</code></td>
+<td>SP 인증 정보 필요</td>
+</tr>
+<tr>
+<td>Pipeline 등록</td>
+<td><code>create_pipeline=true</code> 후 <code>terraform apply</code></td>
+<td>GitHub PAT 필요</td>
+</tr>
+<tr>
+<td><code>ADO_PIPELINE_ID</code> 등록</td>
+<td><code>terraform output pipeline_id</code> → GitHub Secrets 저장</td>
+<td>최초 1회</td>
+</tr>
+</tbody>
+</table>
+<p><strong>배포 실행 시</strong></p>
+<ul>
+<li>파이프라인 실행 전: deployTarget, 배포 버전, 실행 주체 확인</li>
+<li>다운로드 후: 아티팩트 경로 검증(find, web=zip/나머지=jar) 및 누락 시 즉시 실패 처리</li>
+<li>배포 후: 프로세스/포트/헬스엔드포인트 확인</li>
+</ul>
+<hr>
+<h2 id="6-현재-저장소-기준-정합성-메모">6. 현재 저장소 기준 정합성 메모 </h2>
+<p>본 저장소의 gitops 파이프라인 파일 <a href="gitops/ansible/azure-pipelines-vm.yml">gitops/ansible/azure-pipelines-vm.yml</a>은 다음 기능을 포함하고 있어 본 문서 보완 방향과 일치합니다.</p>
+<ul>
+<li>Terraform 실행 여부 분기(runTerraform)</li>
+<li>PoC 자동 진행(수동 승인 게이트 제거)</li>
+<li>아티팩트 타입/버전 파라미터화</li>
+</ul>
+<p>문서는 위 운영 파이프라인 원칙을 따라 유지/업데이트합니다.</p>
+<h2 id="7-서버별-깃헙-링크">7. 서버별 깃헙 링크 </h2>
+<p>[Web/Was (단일 저장소, 폴더 분리)] <a href="https://github.com/ITeyes-IWon/IWonPaymentWeb">https://github.com/ITeyes-IWon/IWonPaymentWeb</a><br>
+[App] <a href="https://github.com/ITeyes-IWon/IWonPaymentApp">https://github.com/ITeyes-IWon/IWonPaymentApp</a><br>
+[Integration] <a href="https://github.com/ITeyes-IWon/IWonPaymentIntegration">https://github.com/ITeyes-IWon/IWonPaymentIntegration</a></p>
+
+      </div>
+      
+      
+    
+    
+    <script type="module">
+// TODO: If ZenUML gets integrated into mermaid in the future,
+//      we can remove the following lines.
+
+
+var MERMAID_CONFIG = ({"startOnLoad":false});
+if (typeof MERMAID_CONFIG !== 'undefined') {
+  MERMAID_CONFIG.startOnLoad = false
+  MERMAID_CONFIG.cloneCssStyles = false
+  MERMAID_CONFIG.theme = "default"
+}
+
+mermaid.initialize(MERMAID_CONFIG || {})
+if (typeof(window['Reveal']) !== 'undefined') {
+  function mermaidRevealHelper(event) {
+    var currentSlide = event.currentSlide
+    var diagrams = currentSlide.querySelectorAll('div.mermaid')
+    for (var i = 0; i < diagrams.length; i++) {
+      var diagram = diagrams[i]
+      if (!diagram.hasAttribute('data-processed')) {
+        mermaid.init(null, diagram, ()=> {
+          Reveal.slide(event.indexh, event.indexv)
+        })
+      }
+    }
+  }
+  Reveal.addEventListener('slidetransitionend', mermaidRevealHelper)
+  Reveal.addEventListener('ready', mermaidRevealHelper)
+  await mermaid.run({
+    nodes: document.querySelectorAll('div.mermaid')
+  })
+} else {
+  await mermaid.run({
+    nodes: document.querySelectorAll('div.mermaid')
+  })
+}
+</script>
+    
+    
+    
+  
+    </body></html>

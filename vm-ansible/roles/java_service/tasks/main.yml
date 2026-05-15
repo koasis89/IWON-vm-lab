@@ -13,6 +13,39 @@
     group: "{{ service_user }}"
     mode: "0755"
 
+- name: Ensure JAR backup directory exists
+  ansible.builtin.file:
+    path: "{{ java_backup_dir | default(java_app_dir ~ '/backup') }}"
+    state: directory
+    owner: "{{ service_user }}"
+    group: "{{ service_user }}"
+    mode: "0755"
+
+- name: Check current deployed JAR
+  ansible.builtin.stat:
+    path: "{{ java_app_dir }}/{{ java_jar_remote_name }}"
+  register: current_java_jar
+
+- name: Backup current JAR before deploy
+  ansible.builtin.copy:
+    remote_src: true
+    src: "{{ java_app_dir }}/{{ java_jar_remote_name }}"
+    dest: "{{ java_backup_dir | default(java_app_dir ~ '/backup') }}/{{ java_jar_remote_name }}.{{ ansible_date_time.epoch }}"
+    owner: "{{ service_user }}"
+    group: "{{ service_user }}"
+    mode: "0644"
+  when: current_java_jar.stat.exists
+
+- name: Update previous-version shortcut
+  ansible.builtin.copy:
+    remote_src: true
+    src: "{{ java_app_dir }}/{{ java_jar_remote_name }}"
+    dest: "{{ java_backup_dir | default(java_app_dir ~ '/backup') }}/{{ java_jar_remote_name }}.previous"
+    owner: "{{ service_user }}"
+    group: "{{ service_user }}"
+    mode: "0644"
+  when: current_java_jar.stat.exists
+
 - name: Upload service JAR
   ansible.builtin.copy:
     src: "{{ java_jar_local_src }}"
@@ -91,6 +124,14 @@
     group: root
     mode: "0755"
   notify: Restart java service
+
+- name: Create rollback helper script in app directory
+  ansible.builtin.template:
+    src: rollback.sh.j2
+    dest: "{{ java_app_dir }}/rollback.sh"
+    owner: root
+    group: root
+    mode: "0755"
 
 - name: Create systemd unit
   ansible.builtin.template:

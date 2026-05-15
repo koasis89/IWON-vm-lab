@@ -15,6 +15,22 @@
   loop:
     - "{{ vm_lab_root }}"
     - /var/www/html
+    - "{{ web_backup_dir | default('/opt/apps/web/backup') }}"
+
+- name: Check existing web root contents
+  ansible.builtin.find:
+    paths: /var/www/html
+    file_type: any
+    hidden: true
+  register: web_root_existing_files
+
+- name: Backup current web root before deploy
+  ansible.builtin.shell: >
+    backup_dir="{{ web_backup_dir | default('/opt/apps/web/backup') }}/html_{{ ansible_date_time.epoch }}" &&
+    mkdir -p "$backup_dir" &&
+    cp -a /var/www/html/. "$backup_dir/"
+  when: web_root_existing_files.matched | int > 0
+  changed_when: true
 
 - name: Upload web archive
   ansible.builtin.copy:

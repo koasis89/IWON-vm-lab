@@ -1,0 +1,601 @@
+<!DOCTYPE html><html><head>
+      <title>gitops-개발자작업</title>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      
+      <link rel="stylesheet" href="file:///c:\Users\koasi\.vscode\extensions\shd101wyy.markdown-preview-enhanced-0.8.22\crossnote\dependencies\katex\katex.min.css">
+      
+      
+      
+      
+      
+      <style>
+      code[class*=language-],pre[class*=language-]{color:#333;background:0 0;font-family:Consolas,"Liberation Mono",Menlo,Courier,monospace;text-align:left;white-space:pre;word-spacing:normal;word-break:normal;word-wrap:normal;line-height:1.4;-moz-tab-size:8;-o-tab-size:8;tab-size:8;-webkit-hyphens:none;-moz-hyphens:none;-ms-hyphens:none;hyphens:none}pre[class*=language-]{padding:.8em;overflow:auto;border-radius:3px;background:#f5f5f5}:not(pre)>code[class*=language-]{padding:.1em;border-radius:.3em;white-space:normal;background:#f5f5f5}.token.blockquote,.token.comment{color:#969896}.token.cdata{color:#183691}.token.doctype,.token.macro.property,.token.punctuation,.token.variable{color:#333}.token.builtin,.token.important,.token.keyword,.token.operator,.token.rule{color:#a71d5d}.token.attr-value,.token.regex,.token.string,.token.url{color:#183691}.token.atrule,.token.boolean,.token.code,.token.command,.token.constant,.token.entity,.token.number,.token.property,.token.symbol{color:#0086b3}.token.prolog,.token.selector,.token.tag{color:#63a35c}.token.attr-name,.token.class,.token.class-name,.token.function,.token.id,.token.namespace,.token.pseudo-class,.token.pseudo-element,.token.url-reference .token.variable{color:#795da3}.token.entity{cursor:help}.token.title,.token.title .token.punctuation{font-weight:700;color:#1d3e81}.token.list{color:#ed6a43}.token.inserted{background-color:#eaffea;color:#55a532}.token.deleted{background-color:#ffecec;color:#bd2c00}.token.bold{font-weight:700}.token.italic{font-style:italic}.language-json .token.property{color:#183691}.language-markup .token.tag .token.punctuation{color:#333}.language-css .token.function,code.language-css{color:#0086b3}.language-yaml .token.atrule{color:#63a35c}code.language-yaml{color:#183691}.language-ruby .token.function{color:#333}.language-markdown .token.url{color:#795da3}.language-makefile .token.symbol{color:#795da3}.language-makefile .token.variable{color:#183691}.language-makefile .token.builtin{color:#0086b3}.language-bash .token.keyword{color:#0086b3}pre[data-line]{position:relative;padding:1em 0 1em 3em}pre[data-line] .line-highlight-wrapper{position:absolute;top:0;left:0;background-color:transparent;display:block;width:100%}pre[data-line] .line-highlight{position:absolute;left:0;right:0;padding:inherit 0;margin-top:1em;background:hsla(24,20%,50%,.08);background:linear-gradient(to right,hsla(24,20%,50%,.1) 70%,hsla(24,20%,50%,0));pointer-events:none;line-height:inherit;white-space:pre}pre[data-line] .line-highlight:before,pre[data-line] .line-highlight[data-end]:after{content:attr(data-start);position:absolute;top:.4em;left:.6em;min-width:1em;padding:0 .5em;background-color:hsla(24,20%,50%,.4);color:#f4f1ef;font:bold 65%/1.5 sans-serif;text-align:center;vertical-align:.3em;border-radius:999px;text-shadow:none;box-shadow:0 1px #fff}pre[data-line] .line-highlight[data-end]:after{content:attr(data-end);top:auto;bottom:.4em}html body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,freesans,sans-serif;font-size:16px;line-height:1.6;color:#333;background-color:#fff;overflow:initial;box-sizing:border-box;word-wrap:break-word}html body>:first-child{margin-top:0}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{line-height:1.2;margin-top:1em;margin-bottom:16px;color:#000}html body h1{font-size:2.25em;font-weight:300;padding-bottom:.3em}html body h2{font-size:1.75em;font-weight:400;padding-bottom:.3em}html body h3{font-size:1.5em;font-weight:500}html body h4{font-size:1.25em;font-weight:600}html body h5{font-size:1.1em;font-weight:600}html body h6{font-size:1em;font-weight:600}html body h1,html body h2,html body h3,html body h4,html body h5{font-weight:600}html body h5{font-size:1em}html body h6{color:#5c5c5c}html body strong{color:#000}html body del{color:#5c5c5c}html body a:not([href]){color:inherit;text-decoration:none}html body a{color:#08c;text-decoration:none}html body a:hover{color:#00a3f5;text-decoration:none}html body img{max-width:100%}html body>p{margin-top:0;margin-bottom:16px;word-wrap:break-word}html body>ol,html body>ul{margin-bottom:16px}html body ol,html body ul{padding-left:2em}html body ol.no-list,html body ul.no-list{padding:0;list-style-type:none}html body ol ol,html body ol ul,html body ul ol,html body ul ul{margin-top:0;margin-bottom:0}html body li{margin-bottom:0}html body li.task-list-item{list-style:none}html body li>p{margin-top:0;margin-bottom:0}html body .task-list-item-checkbox{margin:0 .2em .25em -1.8em;vertical-align:middle}html body .task-list-item-checkbox:hover{cursor:pointer}html body blockquote{margin:16px 0;font-size:inherit;padding:0 15px;color:#5c5c5c;background-color:#f0f0f0;border-left:4px solid #d6d6d6}html body blockquote>:first-child{margin-top:0}html body blockquote>:last-child{margin-bottom:0}html body hr{height:4px;margin:32px 0;background-color:#d6d6d6;border:0 none}html body table{margin:10px 0 15px 0;border-collapse:collapse;border-spacing:0;display:block;width:100%;overflow:auto;word-break:normal;word-break:keep-all}html body table th{font-weight:700;color:#000}html body table td,html body table th{border:1px solid #d6d6d6;padding:6px 13px}html body dl{padding:0}html body dl dt{padding:0;margin-top:16px;font-size:1em;font-style:italic;font-weight:700}html body dl dd{padding:0 16px;margin-bottom:16px}html body code{font-family:Menlo,Monaco,Consolas,'Courier New',monospace;font-size:.85em;color:#000;background-color:#f0f0f0;border-radius:3px;padding:.2em 0}html body code::after,html body code::before{letter-spacing:-.2em;content:'\00a0'}html body pre>code{padding:0;margin:0;word-break:normal;white-space:pre;background:0 0;border:0}html body .highlight{margin-bottom:16px}html body .highlight pre,html body pre{padding:1em;overflow:auto;line-height:1.45;border:#d6d6d6;border-radius:3px}html body .highlight pre{margin-bottom:0;word-break:normal}html body pre code,html body pre tt{display:inline;max-width:initial;padding:0;margin:0;overflow:initial;line-height:inherit;word-wrap:normal;background-color:transparent;border:0}html body pre code:after,html body pre code:before,html body pre tt:after,html body pre tt:before{content:normal}html body blockquote,html body dl,html body ol,html body p,html body pre,html body ul{margin-top:0;margin-bottom:16px}html body kbd{color:#000;border:1px solid #d6d6d6;border-bottom:2px solid #c7c7c7;padding:2px 4px;background-color:#f0f0f0;border-radius:3px}@media print{html body{background-color:#fff}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{color:#000;page-break-after:avoid}html body blockquote{color:#5c5c5c}html body pre{page-break-inside:avoid}html body table{display:table}html body img{display:block;max-width:100%;max-height:100%}html body code,html body pre{word-wrap:break-word;white-space:pre}}.markdown-preview{width:100%;height:100%;box-sizing:border-box}.markdown-preview ul{list-style:disc}.markdown-preview ul ul{list-style:circle}.markdown-preview ul ul ul{list-style:square}.markdown-preview ol{list-style:decimal}.markdown-preview ol ol,.markdown-preview ul ol{list-style-type:lower-roman}.markdown-preview ol ol ol,.markdown-preview ol ul ol,.markdown-preview ul ol ol,.markdown-preview ul ul ol{list-style-type:lower-alpha}.markdown-preview .newpage,.markdown-preview .pagebreak{page-break-before:always}.markdown-preview pre.line-numbers{position:relative;padding-left:3.8em;counter-reset:linenumber}.markdown-preview pre.line-numbers>code{position:relative}.markdown-preview pre.line-numbers .line-numbers-rows{position:absolute;pointer-events:none;top:1em;font-size:100%;left:0;width:3em;letter-spacing:-1px;border-right:1px solid #999;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.markdown-preview pre.line-numbers .line-numbers-rows>span{pointer-events:none;display:block;counter-increment:linenumber}.markdown-preview pre.line-numbers .line-numbers-rows>span:before{content:counter(linenumber);color:#999;display:block;padding-right:.8em;text-align:right}.markdown-preview .mathjax-exps .MathJax_Display{text-align:center!important}.markdown-preview:not([data-for=preview]) .code-chunk .code-chunk-btn-group{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .status{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .output-div{margin-bottom:16px}.markdown-preview .md-toc{padding:0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link div,.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}.markdown-preview .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}.scrollbar-style::-webkit-scrollbar{width:8px}.scrollbar-style::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}.scrollbar-style::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode]){position:relative;width:100%;height:100%;top:0;left:0;margin:0;padding:0;overflow:auto}html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{position:relative;top:0;min-height:100vh}@media screen and (min-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em calc(50% - 457px + 2em)}}@media screen and (max-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{font-size:14px!important;padding:1em}}@media print{html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{display:none}}html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{position:fixed;bottom:8px;left:8px;font-size:28px;cursor:pointer;color:inherit;z-index:99;width:32px;text-align:center;opacity:.4}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] #sidebar-toc-btn{opacity:1}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc{position:fixed;top:0;left:0;width:300px;height:100%;padding:32px 0 48px 0;font-size:14px;box-shadow:0 0 4px rgba(150,150,150,.33);box-sizing:border-box;overflow:auto;background-color:inherit}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar{width:8px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc a{text-decoration:none}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc{padding:0 16px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link div,html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{left:300px;width:calc(100% - 300px);padding:2em calc(50% - 457px - 300px / 2);margin:0;box-sizing:border-box}@media screen and (max-width:1274px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{width:100%}}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .markdown-preview{left:50%;transform:translateX(-50%)}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .md-sidebar-toc{display:none}
+/* Please visit the URL below for more information: */
+/*   https://shd101wyy.github.io/markdown-preview-enhanced/#/customize-css */
+
+      </style>
+      <script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+    </head>
+    <body for="html-export">
+      <div class="crossnote markdown-preview  ">
+      <div>
+<h1 id="gitops-개발자-작업-가이드">GitOps 개발자 작업 가이드 </h1>
+<p>작성일: 2026-04-03<br>
+적용 저장소: <code>IWON-vm-lab/gitops</code></p>
+<hr>
+<h2 id="0-문서-목적">0. 문서 목적 </h2>
+<p>이 문서는 <strong>개발자가 소스 저장소를 수정하고 GitHub Actions로 빌드/배포를 연결할 때 필요한 준비사항과 진행 기준</strong>을 정리한다.</p>
+<p>핵심 원칙은 아래와 같다.</p>
+<ul>
+<li>소스 저장소는 <strong>코드/빌드/버전 관리</strong>를 담당한다.</li>
+<li><code>IWON-vm-lab/gitops</code> 는 <strong>배포 정의(YAML/Terraform/Ansible)</strong> 만 중앙 관리한다.</li>
+<li>PoC 산출물은 운영 공용 서비스에 직접 덮어쓰지 않는다.</li>
+<li>배포 시에는 항상 <code>deployTarget</code>, <code>mavenPackageDefinition</code>, <code>mavenPackageVersion</code> 을 명시한다.</li>
+</ul>
+<hr>
+<h2 id="1-작업-시작-전-준비-체크리스트">1. 작업 시작 전 준비 체크리스트 </h2>
+<h3 id="11-소스-저장소와-배포-대상-매핑deploytarget-기준-완료">1.1 소스 저장소와 배포 대상 매핑(deployTarget 기준 완료) </h3>
+<table>
+<thead>
+<tr>
+<th>소스 위치</th>
+<th>대상 서비스</th>
+<th><code>deployTarget</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IWonPaymentWeb/web</code></td>
+<td>Web</td>
+<td><code>web</code></td>
+</tr>
+<tr>
+<td><code>IWonPaymentWeb/was</code></td>
+<td>WAS</td>
+<td><code>was</code></td>
+</tr>
+<tr>
+<td><code>IWonPaymentApp</code></td>
+<td>App</td>
+<td><code>app</code></td>
+</tr>
+<tr>
+<td><code>IWonPaymentIntegration</code></td>
+<td>Integration</td>
+<td><code>integration</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="12-개발-환경-준비">1.2 개발 환경 준비 </h3>
+<ul>
+<li><code>git</code></li>
+<li><code>java 17</code></li>
+<li><code>gradle</code> 또는 <code>./gradlew</code></li>
+<li><code>ssh</code></li>
+<li>필요 시 <code>az</code></li>
+</ul>
+<h3 id="13-github-secrets-준비리포지토리별-등록-완료">1.3 GitHub Secrets 준비(리포지토리별 등록 완료) </h3>
+<p>관련된 시크릿 항목의 값은 아키텍트에게 요청하여 깃헙 리파지토리에 등록한다.<br>
+공통 시크릿:</p>
+<ol>
+<li><code>ADO_ORG</code> (<code>iteyes-ito</code>)</li>
+<li><code>ADO_PROJECT</code> (<code>iwon-smart-ops</code>)</li>
+<li><code>ADO_PAT</code> (개인 액세스 토큰)</li>
+<li><code>ADO_PIPELINE_ID</code> (2)</li>
+</ol>
+<blockquote>
+<p><code>ADO_PAT</code> 가 채팅/문서/로그에 노출되면 즉시 <strong>폐기(revoke) 후 재발급</strong>한다.</p>
+</blockquote>
+<h3 id="14-버전-전략">1.4 버전 전략 </h3>
+<ul>
+<li><code>latest</code>, 가변 SNAPSHOT 의존 배포는 지양한다.</li>
+<li>아래처럼 <strong>불변 버전</strong>을 사용한다.
+<ul>
+<li><code>1.0.0-main.&lt;shortsha&gt;</code></li>
+<li><code>1.4.2+build.381</code></li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2 id="2-권장-진행-순서">2. 권장 진행 순서 </h2>
+<ol>
+<li>소스 저장소에서 기능 수정</li>
+<li>로컬 에서 빌드/기본 검증</li>
+<li>git push and merge to main</li>
+<li>GitHub Actions에서 Azure Artifacts Feed publish<br>
+→개발자가 push/merge(main) 하면 workflow가 실행되면서 자동 수행</li>
+<li>Azure DevOps에서 <code>deployTarget</code>과 버전을 명시해 CD 실행<br>
+→ GitHub Actions가 publish 직후 REST API로 ADO pipeline을 호출해서 자동 수행</li>
+<li>대상 VM에서 서비스/포트/로그/헬스 확인</li>
+<li>이상 시 즉시 이전 고정 버전으로 롤백</li>
+</ol>
+<h3 id="20-git-main-merge-기준">2.0 git main merge 기준 </h3>
+<ul>
+<li>개발용 브랜치에서 작업한 내용을 <code>main</code> 브랜치로 병합한다. 병합 후에는 <code>main</code> 브랜치가 최신 상태로 유지되도록 원격 저장소에 푸시한다.</li>
+<li>branch 명 예시: <code>dev</code></li>
+<li>병합 명령 예시:</li>
+</ul>
+<pre data-role="codeBlock" data-info="Powershell" class="language-powershell Powershell"><code>git checkout main
+git pull origin main
+git merge &lt;branch명&gt; <span class="token comment">#dev</span>
+git push origin main
+</code></pre><h3 id="21-buildgradle-에-publish-설정이-왜-필요한가">2.1 <code>build.gradle</code> 에 <code>publish</code> 설정이 왜 필요한가 </h3>
+<p>현재 구조에서는 <strong>소스 저장소에서 산출물을 Azure Artifacts Feed로 올린 뒤</strong>, Azure DevOps가 그 버전을 내려받아 배포한다.<br>
+즉, 애플리케이션 소스 저장소의 <code>build.gradle</code> 에 <code>maven-publish</code> 설정이 없으면 <strong>Feed publish 자체가 되지 않으므로 CD가 이어지지 않는다.</strong></p>
+<p>정리하면:</p>
+<ul>
+<li><code>IWonPaymentWeb/web</code>, <code>IWonPaymentWeb/was</code>, <code>IWonPaymentApp</code>, <code>IWonPaymentIntegration</code>의 <code>build.gradle</code> 에는 <code>publish</code> 설정이 필요하다.</li>
+<li><code>IWON-vm-lab/gitops</code> 저장소에는 Java 산출물을 만들지 않으므로 <code>build.gradle publish</code> 설정이 필요 없다.</li>
+</ul>
+<h3 id="22-buildgradle-publish-템플릿프로젝트별-추가완료">2.2 <code>build.gradle</code> publish 템플릿(<em>프로젝트별 추가완료</em>) </h3>
+<p>아래 템플릿은 <code>gitops/gitops구성방안.md</code> 기준으로 바로 적용 가능한 최소 예시다.</p>
+<pre data-role="codeBlock" data-info="gradle" class="language-gradle gradle"><code><span class="token keyword keyword-plugins">plugins</span> <span class="token punctuation">{</span>
+    id <span class="token string">'java'</span>
+    id <span class="token string">'maven-publish'</span>
+<span class="token punctuation">}</span>
+
+group <span class="token operator">=</span> <span class="token string">'com.iteyes.smart'</span>
+version <span class="token operator">=</span> System<span class="token punctuation">.</span><span class="token function">getenv</span><span class="token punctuation">(</span><span class="token interpolation-string"><span class="token string">"APP_VERSION"</span></span><span class="token punctuation">)</span> <span class="token operator">?:</span> <span class="token interpolation-string"><span class="token string">"0.0.0-local"</span></span>
+
+publishing <span class="token punctuation">{</span>
+    publications <span class="token punctuation">{</span>
+        <span class="token function">mavenJava</span><span class="token punctuation">(</span>MavenPublication<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            from components<span class="token punctuation">.</span>java
+            artifactId <span class="token operator">=</span> <span class="token string">'smart-was'</span> <span class="token comment">// 예: smart-web / smart-was / smart-app / smart-integration</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword keyword-repositories">repositories</span> <span class="token punctuation">{</span>
+        maven <span class="token punctuation">{</span>
+            name <span class="token operator">=</span> <span class="token interpolation-string"><span class="token string">"AzureArtifacts"</span></span>
+            url <span class="token operator">=</span> <span class="token function">uri</span><span class="token punctuation">(</span><span class="token interpolation-string"><span class="token string">"https://pkgs.dev.azure.com/iteyes-ito/iwon-smart-ops/_packaging/iwon-smart-feed/maven/v1"</span></span><span class="token punctuation">)</span>
+            credentials <span class="token punctuation">{</span>
+                username <span class="token operator">=</span> <span class="token interpolation-string"><span class="token string">"AZURE_DEVOPS_PAT"</span></span>
+                password <span class="token operator">=</span> System<span class="token punctuation">.</span><span class="token function">getenv</span><span class="token punctuation">(</span><span class="token interpolation-string"><span class="token string">"AZURE_ARTIFACTS_ENV_ACCESS_TOKEN"</span></span><span class="token punctuation">)</span> <span class="token operator">?:</span> <span class="token interpolation-string"><span class="token string">""</span></span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+</code></pre><h3 id="23-저장소별-적용-포인트">2.3 저장소별 적용 포인트 </h3>
+<table>
+<thead>
+<tr>
+<th>저장소/모듈</th>
+<th><code>artifactId</code> 예시</th>
+<th>비고</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IWonPaymentWeb/web</code></td>
+<td><code>smart-web</code></td>
+<td>산출물 패턴 <code>*.zip</code> 또는 웹 빌드 산출물 구조에 맞게 조정</td>
+</tr>
+<tr>
+<td><code>IWonPaymentWeb/was</code></td>
+<td><code>smart-was</code></td>
+<td>기본 <code>*.jar</code></td>
+</tr>
+<tr>
+<td><code>IWonPaymentApp</code></td>
+<td><code>smart-app</code></td>
+<td>기본 <code>*.jar</code></td>
+</tr>
+<tr>
+<td><code>IWonPaymentIntegration</code></td>
+<td><code>smart-integration</code></td>
+<td>기본 <code>*.jar</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="24-개발자-적용-체크포인트">2.4 개발자 적용 체크포인트 </h3>
+<ul>
+<li><code>plugins</code> 에 <code>id 'maven-publish'</code> 가 포함되어 있는가?</li>
+<li><code>artifactId</code> 가 배포 대상과 일치하는가?</li>
+<li><code>version</code> 이 <code>APP_VERSION</code> 기반 불변 버전인가?</li>
+<li>GitHub Actions 에서 <code>./gradlew publish</code> 를 실제 호출하는가?</li>
+<li><code>AZURE_ARTIFACTS_ENV_ACCESS_TOKEN</code> 이 GitHub Secret 또는 환경변수로 주입되는가?</li>
+</ul>
+<hr>
+<h2 id="3-현재-gitops-폴더의-target별-구성">3. 현재 <code>gitops</code> 폴더의 target별 구성 </h2>
+<p>현재 <code>gitops</code> 는 이미 <code>web</code>, <code>was</code>, <code>app</code>, <code>integration</code> 기준으로 분리되어 있다.</p>
+<table>
+<thead>
+<tr>
+<th>대상</th>
+<th>ADO 파라미터</th>
+<th>Task 파일</th>
+<th>적용 Role</th>
+<th>원격 경로/서비스</th>
+<th>산출물</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Web</td>
+<td><code>deployTarget=web</code></td>
+<td><code>gitops/ansible/tasks/deploy-web.yml</code></td>
+<td><code>web</code></td>
+<td>nginx / 정적 웹 배포</td>
+<td><code>*.zip</code></td>
+</tr>
+<tr>
+<td>WAS</td>
+<td><code>deployTarget=was</code></td>
+<td><code>gitops/ansible/tasks/deploy-was.yml</code></td>
+<td><code>java_service</code></td>
+<td><code>/opt/apps/was</code>, <code>was.service</code></td>
+<td><code>*.jar</code></td>
+</tr>
+<tr>
+<td>App</td>
+<td><code>deployTarget=app</code></td>
+<td><code>gitops/ansible/tasks/deploy-app.yml</code></td>
+<td><code>java_service</code></td>
+<td><code>/opt/apps/app</code>, <code>app.service</code></td>
+<td><code>*.jar</code></td>
+</tr>
+<tr>
+<td>Integration</td>
+<td><code>deployTarget=integration</code></td>
+<td><code>gitops/ansible/tasks/deploy-integration.yml</code></td>
+<td><code>java_service</code></td>
+<td><code>/opt/apps/integration</code>, <code>integration.service</code></td>
+<td><code>*.jar</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="31-target별-점검-포인트">3.1 target별 점검 포인트 </h3>
+<ul>
+<li><code>web</code>
+<ul>
+<li>zip 산출물 확인</li>
+<li>nginx 설정 반영 확인</li>
+<li>외부 URL 응답 확인</li>
+</ul>
+</li>
+<li><code>was</code>
+<ul>
+<li><code>/opt/apps/was/app.jar</code> 반영 여부</li>
+<li><code>was.service</code> 상태 및 <code>:8080</code> 확인</li>
+<li>DB/Kafka 연결 로그 확인</li>
+</ul>
+</li>
+<li><code>app</code>
+<ul>
+<li><code>/opt/apps/app/app.jar</code> 반영 여부</li>
+<li><code>app.service</code> 상태 및 로그 확인</li>
+</ul>
+</li>
+<li><code>integration</code>
+<ul>
+<li><code>/opt/apps/integration/IWonPaymentIntegration-0.0.1-SNAPSHOT.jar</code> 반영 여부</li>
+<li><code>integration.service</code> 상태 및 Kafka 연동 로그 확인</li>
+</ul>
+</li>
+</ul>
+<h3 id="32-vm-장애-시-반자동-롤백-방식">3.2 VM 장애 시 반자동 롤백 방식 </h3>
+<p>Java 서비스 VM(<code>was01</code>, <code>app01</code>, <code>smartcontract01</code>)에는 배포 시 아래가 자동 반영된다.</p>
+<ol>
+<li>새 버전 배포 전에 현재 JAR를 <code>backup/</code> 폴더에 사전 백업</li>
+<li>직전 버전을 빠르게 되돌릴 수 있도록 <code>rollback.sh</code> 생성</li>
+<li>운영자(개발자)가 VM에서 <code>rollback.sh</code> 를 실행해 이전 버전으로 즉시 복구 가능</li>
+</ol>
+<p>예시 경로:</p>
+<ul>
+<li><code>was01</code> → <code>/opt/apps/was/backup/</code>, <code>/opt/apps/was/rollback.sh</code></li>
+<li><code>app01</code> → <code>/opt/apps/app/backup/</code>, <code>/opt/apps/app/rollback.sh</code></li>
+<li><code>smartcontract01</code> → <code>/opt/apps/integration/backup/</code>, <code>/opt/apps/integration/rollback.sh</code></li>
+</ul>
+<p>사용 예시:</p>
+<pre data-role="codeBlock" data-info="bash" class="language-bash bash"><code><span class="token builtin class-name">cd</span> /opt/apps/was
+./rollback.sh list               <span class="token comment"># 백업 버전 목록 확인</span>
+<span class="token function">sudo</span> ./rollback.sh               <span class="token comment"># 가장 최근 백업본으로 롤백</span>
+<span class="token function">sudo</span> ./rollback.sh app.jar.previous
+</code></pre><blockquote>
+<p>현재 구조의 롤백은 <strong>완전 자동</strong>이 아니라, 운영자/개발자가 VM에서 상태를 확인한 뒤 <code>rollback.sh</code> 를 실행하는 <strong>반자동 방식</strong>이다.</p>
+</blockquote>
+<h3 id="33-수동-롤백-절차">3.3 수동 롤백 절차 </h3>
+<p>장애 발생 시에는 아래 순서로 <strong>수동 롤백</strong>을 수행한다.</p>
+<h4 id="331-web-수동-롤백">3.3.1 Web 수동 롤백 </h4>
+<p>Web(<code>web01</code>)은 현재 <code>rollback.sh</code> 가 없으므로, <strong>직전 정상 zip 버전을 다시 배포</strong>하는 방식으로 되돌린다.</p>
+<pre data-role="codeBlock" data-info="bash" class="language-bash bash"><code><span class="token function">ssh</span> bastion01
+<span class="token function">ssh</span> iwon@10.0.2.10
+
+<span class="token function">sudo</span> <span class="token function">mkdir</span> <span class="token parameter variable">-p</span> /opt/apps/web/manual-backup
+<span class="token function">sudo</span> <span class="token function">cp</span> <span class="token parameter variable">-r</span> /var/www/html /opt/apps/web/manual-backup/html_<span class="token variable"><span class="token variable">$(</span><span class="token function">date</span> +%Y%m%d_%H%M%S<span class="token variable">)</span></span>
+
+<span class="token comment"># 직전 정상 zip 확보 후</span>
+<span class="token function">sudo</span> <span class="token function">rm</span> <span class="token parameter variable">-rf</span> /var/www/html/*
+<span class="token function">sudo</span> <span class="token function">unzip</span> <span class="token parameter variable">-oq</span> /opt/vm-lab/html.zip <span class="token parameter variable">-d</span> /var/www/html
+<span class="token function">sudo</span> nginx <span class="token parameter variable">-t</span>
+<span class="token function">sudo</span> systemctl reload nginx
+</code></pre><p>확인 포인트:</p>
+<ul>
+<li><code>curl -I https://iwon-smart.site</code></li>
+<li><code>sudo systemctl status nginx</code></li>
+<li><code>/var/log/nginx/error.log</code></li>
+</ul>
+<h4 id="332-wasappintegration-수동-롤백">3.3.2 WAS/App/Integration 수동 롤백 </h4>
+<p>Java 서비스는 <code>rollback.sh</code> 를 이용하는 것이 가장 빠르다.</p>
+<p>예시(WAS):</p>
+<pre data-role="codeBlock" data-info="bash" class="language-bash bash"><code><span class="token function">ssh</span> bastion01
+<span class="token function">ssh</span> was01
+
+<span class="token builtin class-name">cd</span> /opt/apps/was
+./rollback.sh list
+<span class="token function">sudo</span> ./rollback.sh
+<span class="token function">sudo</span> systemctl status was
+</code></pre><p>예시(App):</p>
+<pre data-role="codeBlock" data-info="bash" class="language-bash bash"><code><span class="token function">ssh</span> bastion01
+<span class="token function">ssh</span> app01
+<span class="token builtin class-name">cd</span> /opt/apps/app
+./rollback.sh list
+<span class="token function">sudo</span> ./rollback.sh
+<span class="token function">sudo</span> systemctl status app
+</code></pre><p>예시(Integration):</p>
+<pre data-role="codeBlock" data-info="bash" class="language-bash bash"><code><span class="token function">ssh</span> bastion01
+<span class="token function">ssh</span> smartcontract01
+<span class="token builtin class-name">cd</span> /opt/apps/integration
+./rollback.sh list
+<span class="token function">sudo</span> ./rollback.sh
+<span class="token function">sudo</span> systemctl status integration
+</code></pre><h4 id="333-rollbacksh-백업-파일명-의미">3.3.3 <code>rollback.sh</code> 백업 파일명 의미 </h4>
+<p><code>jar.</code> 뒤의 숫자는 <strong>백업이 만들어진 시점의 Unix epoch timestamp(초)</strong> 입니다.</p>
+<p>예시:</p>
+<ul>
+<li><code>1775624194</code><br>
+→ <strong>1970-01-01 00:00:00 UTC부터 지난 초 수</strong></li>
+</ul>
+<p>이 값은 Ansible의 백업 로직에서 보통 이런 식으로 붙습니다:</p>
+<pre data-role="codeBlock" data-info="yaml" class="language-yaml yaml"><code><span class="token punctuation">{</span><span class="token punctuation">{</span> java_jar_remote_name <span class="token punctuation">}</span><span class="token punctuation">}</span>.<span class="token punctuation">{</span><span class="token punctuation">{</span> ansible_date_time.epoch <span class="token punctuation">}</span><span class="token punctuation">}</span>
+</code></pre><p>즉 의미는:</p>
+<ul>
+<li><code>IWonPaymentIntegration-0.0.1-SNAPSHOT.jar.1775624194</code><br>
+→ 해당 시각에 백업된 JAR</li>
+<li><code>...jar.previous</code><br>
+→ 가장 최근 직전 버전을 가리키는 별도 백업본</li>
+</ul>
+<h2 id="정리">정리 </h2>
+<table>
+<thead>
+<tr>
+<th>파일명 형태</th>
+<th>의미</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>*.jar.&lt;숫자&gt;</code></td>
+<td>특정 시점의 백업본</td>
+</tr>
+<tr>
+<td><code>*.jar.previous</code></td>
+<td>바로 이전 버전 백업본</td>
+</tr>
+</tbody>
+</table>
+<h2 id="변환-방법">변환 방법 </h2>
+<p>리눅스에서 바로 확인하려면:</p>
+<pre data-role="codeBlock" data-info="bash" class="language-bash bash"><code><span class="token function">date</span> <span class="token parameter variable">-d</span> @1775624194
+</code></pre><p>한국시간(KST)으로 보려면:</p>
+<pre data-role="codeBlock" data-info="bash" class="language-bash bash"><code><span class="token assign-left variable">TZ</span><span class="token operator">=</span>Asia/Seoul <span class="token function">date</span> <span class="token parameter variable">-d</span> @1775624194
+</code></pre><h3 id="참고">참고 </h3>
+<ul>
+<li><code>@숫자</code> = epoch timestamp</li>
+<li><code>TZ=Asia/Seoul</code> = 한국시간 기준 표시</li>
+</ul>
+<h4 id="333-수동-롤백-공통-체크리스트">3.3.3 수동 롤백 공통 체크리스트 </h4>
+<ul>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox"> 현재 장애 증상과 시각을 기록했는가?</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox"> 직전 정상 버전을 확인했는가?</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox"> 롤백 후 <code>systemctl status</code> 를 확인했는가?</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox"> 포트 리슨/헬스체크를 확인했는가?</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox"> 로그(<code>/var/log/iwon/*.log</code>, <code>journalctl</code>)를 확인했는가?</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox"> 필요 시 ADO 배포 이력에 장애 원인을 메모했는가?</li>
+</ul>
+<hr>
+<h2 id="4-webwas-용-github-actions-분리-기준">4. <code>web/was</code> 용 GitHub Actions 분리 기준 </h2>
+<p><code>IWonPaymentWeb</code> 저장소는 <code>web</code> 과 <code>was</code> 가 한 저장소에 공존하므로, <strong>GitHub Actions 를 반드시 2개로 분리</strong>한다.</p>
+<h3 id="41-deploy-webyml">4.1 <code>deploy-web.yml</code> </h3>
+<ul>
+<li>트리거 경로: <code>web/**</code></li>
+<li>고정값:
+<ul>
+<li><code>deployTarget=web</code></li>
+<li><code>mavenPackageDefinition=com.iteyes.smart:smart-web</code></li>
+<li><code>artifactPattern=*.zip</code></li>
+</ul>
+</li>
+</ul>
+<h3 id="42-deploy-wasyml">4.2 <code>deploy-was.yml</code> </h3>
+<ul>
+<li>트리거 경로: <code>was/**</code></li>
+<li>고정값:
+<ul>
+<li><code>deployTarget=was</code></li>
+<li><code>mavenPackageDefinition=com.iteyes.smart:smart-was</code></li>
+<li><code>artifactPattern=*.jar</code></li>
+</ul>
+</li>
+</ul>
+<h3 id="43-분리-이유">4.3 분리 이유 </h3>
+<ul>
+<li>동일 저장소여도 배포 대상이 다르다.</li>
+<li><code>web</code> 변경이 <code>was01</code> 로 잘못 나가거나, <code>was</code> 변경이 <code>web01</code> 로 가는 것을 방지해야 한다.</li>
+<li>운영 안정성을 위해 <strong>workflow 파일 분리 + path 필터 분리 + deployTarget 고정</strong>이 필요하다.</li>
+</ul>
+<hr>
+<h2 id="5-appintegration-publishdeploy-workflow-정리">5. <code>app/integration</code> publish/deploy workflow 정리 </h2>
+<p><code>IWonPaymentApp</code>, <code>IWonPaymentIntegration</code> 은 저장소별로 하나의 배포 타깃이 명확하므로, 저장소별 workflow 1개씩으로 정리한다.</p>
+<h3 id="51-app">5.1 App </h3>
+<p>파일 예시:</p>
+<ul>
+<li><code>.github/workflows/deploy-app.yml</code></li>
+</ul>
+<p>고정값:</p>
+<ul>
+<li><code>deployTarget=app</code></li>
+<li><code>mavenPackageDefinition=com.iteyes.smart:smart-app</code></li>
+<li><code>artifactPattern=*.jar</code></li>
+</ul>
+<p>흐름:</p>
+<ol>
+<li>checkout</li>
+<li>JDK 17 설정</li>
+<li>버전 계산</li>
+<li><code>./gradlew build</code> 또는 <code>./gradlew publish</code></li>
+<li>Azure Artifacts publish</li>
+<li>ADO Pipeline REST 호출</li>
+</ol>
+<h3 id="52-integration">5.2 Integration </h3>
+<p>파일 예시:</p>
+<ul>
+<li><code>.github/workflows/deploy-integration.yml</code></li>
+</ul>
+<p>고정값:</p>
+<ul>
+<li><code>deployTarget=integration</code></li>
+<li><code>mavenPackageDefinition=com.iteyes.smart:smart-integration</code></li>
+<li><code>artifactPattern=*.jar</code></li>
+</ul>
+<p>추가 확인:</p>
+<ul>
+<li>Kafka 환경변수 연동 여부</li>
+<li>배포 후 <code>integration.service</code> 로그 확인</li>
+</ul>
+<hr>
+<h2 id="6-deploytarget별-시크릿버전-규칙-고정">6. <code>deployTarget</code>별 시크릿/버전 규칙 고정 </h2>
+<h3 id="61-공통-시크릿-규칙">6.1 공통 시크릿 규칙 </h3>
+<p>모든 저장소에서 공통으로 아래 값은 동일하게 유지한다.</p>
+<table>
+<thead>
+<tr>
+<th>시크릿</th>
+<th>값 예시</th>
+<th>비고</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ADO_ORG</code></td>
+<td><code>iteyes-ito</code></td>
+<td>고정</td>
+</tr>
+<tr>
+<td><code>ADO_PROJECT</code></td>
+<td><code>iwon-smart-ops</code></td>
+<td>고정</td>
+</tr>
+<tr>
+<td><code>ADO_PIPELINE_ID</code></td>
+<td><code>2</code></td>
+<td>배포 파이프라인 ID</td>
+</tr>
+<tr>
+<td><code>ADO_PAT</code></td>
+<td>비공개</td>
+<td>노출 즉시 폐기</td>
+</tr>
+</tbody>
+</table>
+<h3 id="62-타깃별-고정-규칙">6.2 타깃별 고정 규칙 </h3>
+<table>
+<thead>
+<tr>
+<th>타깃</th>
+<th><code>deployTarget</code></th>
+<th>패키지 정의</th>
+<th>패턴</th>
+<th>권장 버전 형식</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Web</td>
+<td><code>web</code></td>
+<td><code>com.iteyes.smart:smart-web</code></td>
+<td><code>*.zip</code></td>
+<td><code>1.0.0-web.&lt;shortsha&gt;</code></td>
+</tr>
+<tr>
+<td>WAS</td>
+<td><code>was</code></td>
+<td><code>com.iteyes.smart:smart-was</code></td>
+<td><code>*.jar</code></td>
+<td><code>1.0.0-was.&lt;shortsha&gt;</code></td>
+</tr>
+<tr>
+<td>App</td>
+<td><code>app</code></td>
+<td><code>com.iteyes.smart:smart-app</code></td>
+<td><code>*.jar</code></td>
+<td><code>1.0.0-app.&lt;shortsha&gt;</code></td>
+</tr>
+<tr>
+<td>Integration</td>
+<td><code>integration</code></td>
+<td><code>com.iteyes.smart:smart-integration</code></td>
+<td><code>*.jar</code></td>
+<td><code>1.0.0-int.&lt;shortsha&gt;</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="63-안전-규칙">6.3 안전 규칙 </h3>
+<ul>
+<li>workflow 안에서 <code>deployTarget</code> 을 동적으로 바꾸지 않는다.</li>
+<li>repo/폴더별 workflow 에서 값을 <strong>하드고정</strong>한다.</li>
+<li>운영 배포는 <code>main</code> 직접 실험이 아니라 <strong>검증 브랜치 → 승인 → 반영</strong> 순서로 진행한다.</li>
+<li>PoC 배포는 운영 공용 VM/서비스명과 분리한다.</li>
+</ul>
+<hr>
+<h2 id="7-개발자용-최종-체크리스트">7. 개발자용 최종 체크리스트 </h2>
+<p>배포 전:</p>
+<ul>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox"> 어떤 저장소/폴더를 수정했는지 명확한가?</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox"> 해당 workflow 의 <code>deployTarget</code> 이 고정되어 있는가?</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox"> <code>mavenPackageVersion</code> 이 불변 버전인가?</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox"> 운영 대상과 PoC 대상을 혼동하지 않았는가?</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox"> <code>ADO_PAT</code> 노출 여부를 점검했는가?</li>
+</ul>
+<p>배포 후:</p>
+<ul>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox"> ADO run result 확인</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox"> 대상 서비스 <code>systemctl status</code> 확인</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox"> 포트 리슨 여부 확인</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox"> 애플리케이션 헬스 및 로그 확인</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox"> 이상 시 즉시 이전 버전 롤백</li>
+</ul>
+<hr>
+<h2 id="8-github-actions-workflow-초안-파일">8. GitHub Actions workflow 초안 파일 </h2>
+<p>바로 복사해 사용할 수 있는 초안 파일은 아래 경로에 정리했다.</p>
+<ul>
+<li><code>gitops/workflow-templates/deploy-web.yml</code></li>
+<li><code>gitops/workflow-templates/deploy-was.yml</code></li>
+<li><code>gitops/workflow-templates/deploy-app.yml</code></li>
+<li><code>gitops/workflow-templates/deploy-integration.yml</code></li>
+<li><code>gitops/workflow-templates/README.md</code></li>
+</ul>
+<p>사용 방법:</p>
+<ol>
+<li>각 파일을 대상 저장소의 <code>.github/workflows/</code> 로 복사</li>
+<li>실제 모듈 경로/빌드 명령(<code>gradlew</code>, <code>npm build</code> 등)에 맞게 한 번 조정</li>
+<li>GitHub Secrets 등록 후 <code>main</code> 또는 <code>workflow_dispatch</code> 로 검증</li>
+</ol>
+<p>다음 단계가 필요하면 이 초안을 기준으로 <strong>저장소별 실제 workflow 형태로 바로 구체화</strong>하면 된다.</p>
+</div>
+      </div>
+      
+      
+    
+    
+    
+    
+    
+    
+  
+    </body></html>

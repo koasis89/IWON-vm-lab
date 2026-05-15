@@ -2,70 +2,126 @@ name: Deploy Integration Artifact
 
 on:
   push:
-    branches: [main]
+    branches: ["main"]
     paths:
-      - 'src/**'
-      - 'build.gradle'
-      - 'settings.gradle'
-      - 'gradle/**'
-      - 'gradlew'
-      - 'gradlew.bat'
-      - '.github/workflows/deploy-integration.yml'
+      - "src/**"
+      - "build.gradle"
+      - "settings.gradle"
+      - "gradle/**"
+      - "gradlew"
+      - "gradlew.bat"
+      - ".github/workflows/deploy-integration.yml"
+
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
-  group: deploy-integration-${{ github.ref }}
+  group: iwonpaymentintegration-${{ github.ref }}
   cancel-in-progress: false
 
 env:
-  DEPLOY_TARGET: integration
+  ADO_ORG: iteyes-ito
+  ADO_PROJECT: iwon-smart-ops
   FEED_NAME: iwon-smart-feed
+  DEPLOY_TARGET: integration
   MAVEN_PACKAGE_DEF: com.iteyes.smart:smart-integration
-  ARTIFACT_PATTERN: '*.jar'
+  ARTIFACT_PATTERN: "*.jar"
 
 jobs:
-  build-publish-deploy:
+  build-publish-trigger:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
 
     steps:
-      - name: Checkout source
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: |
+            gradle/wrapper/gradle-wrapper.properties
+            build.gradle
+            settings.gradle
 
       - name: Compute immutable version
         shell: bash
         run: |
-          SHORT_SHA="${GITHUB_SHA::7}"
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
           echo "APP_VERSION=1.0.0-int.${SHORT_SHA}" >> "$GITHUB_ENV"
 
-      - name: Build and publish Integration artifact
+      - name: Build
+        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew clean build -x test
+
+      - name: Check if Integration version already exists in Azure Artifacts
+        id: check_version
+        shell: bash
+        env:
+          APP_VERSION: ${{ env.APP_VERSION }}
+          ADO_PAT: ${{ secrets.ADO_PAT }}
+        run: |
+          set -euo pipefail
+          ARTIFACT_URL="https://pkgs.dev.azure.com/${ADO_ORG}/${ADO_PROJECT}/_packaging/${FEED_NAME}/maven/v1/com/iteyes/smart/smart-integration/${APP_VERSION}/smart-integration-${APP_VERSION}.jar"
+          STATUS=$(curl -sS -o /dev/null -w "%{http_code}" -u ":${ADO_PAT}" "${ARTIFACT_URL}")
+          if [ "${STATUS}" = "200" ]; then
+            echo "already_exists=true" >> "$GITHUB_OUTPUT"
+            echo "Integration package already exists. publish step will be skipped. version=${APP_VERSION}"
+          elif [ "${STATUS}" = "404" ]; then
+            echo "already_exists=false" >> "$GITHUB_OUTPUT"
+            echo "Integration package does not exist yet. publish step will run. version=${APP_VERSION}"
+          elif [ "${STATUS}" = "401" ] || [ "${STATUS}" = "403" ]; then
+            echo "::error::Cannot check Azure Artifacts package version (HTTP ${STATUS}). Verify PAT permissions."
+            exit 1
+          else
+            echo "::error::Unexpected status while checking Azure Artifacts package version. HTTP=${STATUS}"
+            exit 1
+          fi
+
+      - name: Publish integration package to Azure Artifacts
+        if: steps.check_version.outputs.already_exists == 'false'
         shell: bash
         env:
           APP_VERSION: ${{ env.APP_VERSION }}
           AZURE_ARTIFACTS_ENV_ACCESS_TOKEN: ${{ secrets.ADO_PAT }}
         run: |
-          set -euo pipefail
-          chmod +x ./gradlew
-          ./gradlew clean build publish -x test
+          ./gradlew publish
 
-      - name: Trigger Azure DevOps deploy
+      - name: Trigger Azure DevOps deploy (integration)
         shell: bash
         env:
-          ADO_ORG: ${{ secrets.ADO_ORG }}
-          ADO_PROJECT: ${{ secrets.ADO_PROJECT }}
           ADO_PIPELINE_ID: ${{ secrets.ADO_PIPELINE_ID }}
           ADO_PAT: ${{ secrets.ADO_PAT }}
         run: |
           set -euo pipefail
-          cat > ado-run.json <<EOF
+
+          for required in ADO_ORG ADO_PROJECT ADO_PIPELINE_ID ADO_PAT DEPLOY_TARGET FEED_NAME MAVEN_PACKAGE_DEF APP_VERSION ARTIFACT_PATTERN; do
+            if [ -z "${!required:-}" ]; then
+              echo "::error::Missing required variable: ${required}"
+              exit 1
+            fi
+          done
+
+          if ! [[ "${ADO_PIPELINE_ID}" =~ ^[0-9]+$ ]]; then
+            echo "::error::ADO_PIPELINE_ID must be numeric. current='${ADO_PIPELINE_ID}'"
+            exit 1
+          fi
+
+          cat > run-pipeline.json <<EOF
           {
+            "resources": {
+              "repositories": {
+                "self": {
+                  "refName": "refs/heads/main"
+                }
+              }
+            },
             "templateParameters": {
               "runTerraform": "false",
               "deployTarget": "${DEPLOY_TARGET}",
@@ -77,8 +133,78 @@ jobs:
           }
           EOF
 
-          curl --fail-with-body -u ":${ADO_PAT}" \
-            -H "Content-Type: application/json" \
-            -X POST \
-            --data @ado-run.json \
-            "https://dev.azure.com/${ADO_ORG}/${ADO_PROJECT}/_apis/pipelines/${ADO_PIPELINE_ID}/runs?api-version=7.1"
+          python3 - <<'PY'
+          import json
+          with open("run-pipeline.json", "r", encoding="utf-8") as f:
+            payload = json.load(f)
+          required_keys = [
+            "runTerraform",
+            "deployTarget",
+            "artifactFeedName",
+            "mavenPackageDefinition",
+            "mavenPackageVersion",
+            "artifactPattern",
+          ]
+          missing = [k for k in required_keys if k not in payload.get("templateParameters", {})]
+          if missing:
+            raise SystemExit(f"Missing templateParameters keys: {', '.join(missing)}")
+          print("Trigger payload validation: OK")
+          print(json.dumps(payload, indent=2))
+          PY
+
+          PIPELINE_META_URL="https://dev.azure.com/${ADO_ORG}/${ADO_PROJECT}/_apis/pipelines/${ADO_PIPELINE_ID}?api-version=7.1"
+          META_STATUS=$(curl --silent --show-error \
+            -u ":${ADO_PAT}" \
+            -o pipeline-meta.json \
+            -w "%{http_code}" \
+            "${PIPELINE_META_URL}")
+
+          if [ "${META_STATUS}" != "200" ]; then
+            echo "::error::Pipeline precheck failed. id=${ADO_PIPELINE_ID}, http=${META_STATUS}"
+            echo "Pipeline response body:"
+            cat pipeline-meta.json
+            exit 1
+          fi
+
+          for API_VERSION in 7.1 7.0; do
+            API_URL="https://dev.azure.com/${ADO_ORG}/${ADO_PROJECT}/_apis/pipelines/${ADO_PIPELINE_ID}/runs?api-version=${API_VERSION}"
+
+            HTTP_STATUS=$(curl --silent --show-error \
+              -u ":${ADO_PAT}" \
+              -H "Content-Type: application/json" \
+              -X POST \
+              --data @run-pipeline.json \
+              -o run-response.json \
+              -w "%{http_code}" \
+              "${API_URL}")
+
+            if [ "${HTTP_STATUS}" = "200" ] || [ "${HTTP_STATUS}" = "201" ]; then
+              RUN_ID=$(python3 -c 'import json; print(json.load(open("run-response.json", "r", encoding="utf-8")).get("id", "unknown"))')
+              echo "ADO Pipeline Run ID: ${RUN_ID} (api-version=${API_VERSION})"
+              exit 0
+            fi
+
+            echo "Pipeline trigger failed. api-version=${API_VERSION}, http=${HTTP_STATUS}"
+            python3 - <<'PY'
+          import json
+          try:
+            data = json.load(open("run-response.json", "r", encoding="utf-8"))
+            msg = data.get("message") or data.get("error", {}).get("message") or "(no message)"
+            type_key = data.get("typeKey") or data.get("errorCode") or "(no typeKey)"
+            print(f"ADO error type: {type_key}")
+            print(f"ADO error message: {msg}")
+          except Exception:
+            print("Raw error body:")
+            print(open("run-response.json", "r", encoding="utf-8", errors="replace").read())
+          PY
+
+            if [ "${HTTP_STATUS}" = "400" ] && [ "${API_VERSION}" = "7.1" ]; then
+              echo "Retrying with api-version=7.0"
+              continue
+            fi
+
+            break
+          done
+
+          echo "::error::Failed to trigger Azure DevOps pipeline. Check error body above for exact field/type mismatch."
+          exit 1
