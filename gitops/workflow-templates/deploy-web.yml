@@ -119,7 +119,18 @@ jobs:
           ADO_PAT: ${{ secrets.ADO_PAT }}
         run: |
           set -euo pipefail
-          API_URL="https://dev.azure.com/${ADO_ORG}/${ADO_PROJECT}/_apis/pipelines/${ADO_PIPELINE_ID}/runs?api-version=7.1"
+
+          for required in ADO_ORG ADO_PROJECT ADO_PIPELINE_ID ADO_PAT DEPLOY_TARGET FEED_NAME MAVEN_PACKAGE_DEF APP_VERSION ARTIFACT_PATTERN; do
+            if [ -z "${!required:-}" ]; then
+              echo "::error::Missing required variable: ${required}"
+              exit 1
+            fi
+          done
+
+          if ! [[ "${ADO_PIPELINE_ID}" =~ ^[0-9]+$ ]]; then
+            echo "::error::ADO_PIPELINE_ID must be numeric. current='${ADO_PIPELINE_ID}'"
+            exit 1
+          fi
 
           cat > run-pipeline.json <<EOF
           {
@@ -141,11 +152,78 @@ jobs:
           }
           EOF
 
-          RESPONSE=$(curl --fail-with-body --silent --show-error \
-            -u ":${ADO_PAT}" \
-            -H "Content-Type: application/json" \
-            -X POST \
-            --data @run-pipeline.json \
-            "${API_URL}")
+          python3 - <<'PY'
+          import json
+          with open("run-pipeline.json", "r", encoding="utf-8") as f:
+            payload = json.load(f)
+          required_keys = [
+            "runTerraform",
+            "deployTarget",
+            "artifactFeedName",
+            "mavenPackageDefinition",
+            "mavenPackageVersion",
+            "artifactPattern",
+          ]
+          missing = [k for k in required_keys if k not in payload.get("templateParameters", {})]
+          if missing:
+            raise SystemExit(f"Missing templateParameters keys: {', '.join(missing)}")
+          print("Trigger payload validation: OK")
+          print(json.dumps(payload, indent=2))
+          PY
 
-          echo "ADO Pipeline Run ID: $(echo "${RESPONSE}" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("id","unknown"))')"
+          PIPELINE_META_URL="https://dev.azure.com/${ADO_ORG}/${ADO_PROJECT}/_apis/pipelines/${ADO_PIPELINE_ID}?api-version=7.1"
+          META_STATUS=$(curl --silent --show-error \
+            -u ":${ADO_PAT}" \
+            -o pipeline-meta.json \
+            -w "%{http_code}" \
+            "${PIPELINE_META_URL}")
+
+          if [ "${META_STATUS}" != "200" ]; then
+            echo "::error::Pipeline precheck failed. id=${ADO_PIPELINE_ID}, http=${META_STATUS}"
+            echo "Pipeline response body:"
+            cat pipeline-meta.json
+            exit 1
+          fi
+
+          for API_VERSION in 7.1 7.0; do
+            API_URL="https://dev.azure.com/${ADO_ORG}/${ADO_PROJECT}/_apis/pipelines/${ADO_PIPELINE_ID}/runs?api-version=${API_VERSION}"
+
+            HTTP_STATUS=$(curl --silent --show-error \
+              -u ":${ADO_PAT}" \
+              -H "Content-Type: application/json" \
+              -X POST \
+              --data @run-pipeline.json \
+              -o run-response.json \
+              -w "%{http_code}" \
+              "${API_URL}")
+
+            if [ "${HTTP_STATUS}" = "200" ] || [ "${HTTP_STATUS}" = "201" ]; then
+              RUN_ID=$(python3 -c 'import json; print(json.load(open("run-response.json", "r", encoding="utf-8")).get("id", "unknown"))')
+              echo "ADO Pipeline Run ID: ${RUN_ID} (api-version=${API_VERSION})"
+              exit 0
+            fi
+
+            echo "Pipeline trigger failed. api-version=${API_VERSION}, http=${HTTP_STATUS}"
+            python3 - <<'PY'
+          import json
+          try:
+            data = json.load(open("run-response.json", "r", encoding="utf-8"))
+            msg = data.get("message") or data.get("error", {}).get("message") or "(no message)"
+            type_key = data.get("typeKey") or data.get("errorCode") or "(no typeKey)"
+            print(f"ADO error type: {type_key}")
+            print(f"ADO error message: {msg}")
+          except Exception:
+            print("Raw error body:")
+            print(open("run-response.json", "r", encoding="utf-8", errors="replace").read())
+          PY
+
+            if [ "${HTTP_STATUS}" = "400" ] && [ "${API_VERSION}" = "7.1" ]; then
+              echo "Retrying with api-version=7.0"
+              continue
+            fi
+
+            break
+          done
+
+          echo "::error::Failed to trigger Azure DevOps pipeline. Check error body above for exact field/type mismatch."
+          exit 1
