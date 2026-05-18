@@ -110,12 +110,104 @@ jobs:
             exit 1
           fi
 
+          PIPELINE_META_URL="https://dev.azure.com/${ADO_ORG}/${ADO_PROJECT}/_apis/pipelines/${ADO_PIPELINE_ID}?api-version=7.1"
+          META_STATUS=$(curl --silent --show-error \
+            -u ":${ADO_PAT}" \
+            -o pipeline-meta.json \
+            -w "%{http_code}" \
+            "${PIPELINE_META_URL}")
+
+          if [ "${META_STATUS}" != "200" ]; then
+            echo "::error::Pipeline precheck failed. id=${ADO_PIPELINE_ID}, http=${META_STATUS}"
+            echo "Pipeline response body:"
+            cat pipeline-meta.json
+            exit 1
+          fi
+
+          PIPELINE_REF=$(ADO_BRANCH="${ADO_BRANCH:-}" python3 - <<'PY'
+          import json
+          import os
+
+          def normalize_ref(value: str | None) -> str | None:
+            if not value:
+              return None
+            value = value.strip()
+            if not value:
+              return None
+            if value.startswith("refs/"):
+              return value
+            return f"refs/heads/{value}"
+
+          override = normalize_ref(os.environ.get("ADO_BRANCH"))
+          if override:
+            print(override)
+            raise SystemExit(0)
+
+          with open("pipeline-meta.json", "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+
+          def get_path(obj, *path):
+            current = obj
+            for part in path:
+              if not isinstance(current, dict):
+                return None
+              current = current.get(part)
+            return current if isinstance(current, str) else None
+
+          prioritized = [
+            get_path(data, "configuration", "repository", "defaultBranch"),
+            get_path(data, "configuration", "repository", "default_branch"),
+            get_path(data, "configuration", "repository", "refName"),
+            get_path(data, "configuration", "repository", "branch"),
+            get_path(data, "configuration", "repository", "branchName"),
+            get_path(data, "configuration", "repository", "properties", "defaultBranch"),
+            get_path(data, "repository", "defaultBranch"),
+            get_path(data, "repository", "refName"),
+          ]
+
+          for candidate in prioritized:
+            normalized = normalize_ref(candidate)
+            if normalized:
+              print(normalized)
+              raise SystemExit(0)
+
+          discovered = []
+
+          def walk(node):
+            if isinstance(node, dict):
+              for key, value in node.items():
+                if isinstance(value, str) and key.lower() in {
+                  "defaultbranch",
+                  "default_branch",
+                  "branch",
+                  "branchname",
+                  "refname",
+                }:
+                  discovered.append(value)
+                walk(value)
+            elif isinstance(node, list):
+              for item in node:
+                walk(item)
+
+          walk(data)
+
+          for candidate in discovered:
+            normalized = normalize_ref(candidate)
+            if normalized:
+              print(normalized)
+              raise SystemExit(0)
+
+          print("refs/heads/main")
+          PY
+          )
+          echo "Using Azure DevOps pipeline ref: ${PIPELINE_REF}"
+
           cat > run-pipeline.json <<EOF
           {
             "resources": {
               "repositories": {
                 "self": {
-                  "refName": "refs/heads/main"
+                  "refName": "${PIPELINE_REF}"
                 }
               }
             },
@@ -148,20 +240,6 @@ jobs:
           print("Trigger payload validation: OK")
           print(json.dumps(payload, indent=2))
           PY
-
-          PIPELINE_META_URL="https://dev.azure.com/${ADO_ORG}/${ADO_PROJECT}/_apis/pipelines/${ADO_PIPELINE_ID}?api-version=7.1"
-          META_STATUS=$(curl --silent --show-error \
-            -u ":${ADO_PAT}" \
-            -o pipeline-meta.json \
-            -w "%{http_code}" \
-            "${PIPELINE_META_URL}")
-
-          if [ "${META_STATUS}" != "200" ]; then
-            echo "::error::Pipeline precheck failed. id=${ADO_PIPELINE_ID}, http=${META_STATUS}"
-            echo "Pipeline response body:"
-            cat pipeline-meta.json
-            exit 1
-          fi
 
           for API_VERSION in 7.1 7.0; do
             API_URL="https://dev.azure.com/${ADO_ORG}/${ADO_PROJECT}/_apis/pipelines/${ADO_PIPELINE_ID}/runs?api-version=${API_VERSION}"
